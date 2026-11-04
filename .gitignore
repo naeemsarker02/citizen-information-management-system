@@ -7,3 +7,10 @@ coverage/
 npm-debug.log*
 .DS_Store
 *.before-glob-override
+.nyc_output/
+.vscode/
+.idea/
+Thumbs.db
+tmp/
+dist/
+
