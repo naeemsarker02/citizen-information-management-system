@@ -1,0 +1,45 @@
+{
+  "name": "cims-backend",
+  "version": "1.0.0",
+  "description": "Backend API prototype for fictional citizen records and correction request management",
+  "main": "src/server.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "jest --runInBand",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js",
+    "db:schema": "mysql -u root -p cims_db < database/migrations/001_initial_schema.sql",
+    "db:seed": "node database/seeds/seed.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.9",
+    "express": "^5.3.0",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "mysql2": "^3.24.6",
+    "swagger-jsdoc": "6.3.0",
+    "swagger-ui-express": "^5.0.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "jest": "30.5.2",
+    "nodemon": "3.1.14",
+    "supertest": "7.3.1"
+  },
+  "overrides": {
+    "glob": "14.0.3"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
