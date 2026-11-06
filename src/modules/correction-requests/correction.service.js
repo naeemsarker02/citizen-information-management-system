@@ -4,9 +4,6 @@ const { ALLOWED_CORRECTION_FIELDS } = require('../../constants/allowed-fields');
 const { logAudit } = require('../audit/audit.service');
 const correctionRepo = require('./correction.repository');
 
-/**
- * Map a DB row → response DTO. Never leak internal-only columns.
- */
 function sanitize(request) {
   return {
     id: request.id,
@@ -26,11 +23,6 @@ function sanitize(request) {
   };
 }
 
-/**
- * Explicit field-name → record-column mapping.
- * NEVER use dynamic access like `record[fieldName]` — a spoofed field name
- * could then accidentally read `password_hash` or other columns.
- */
 function getRecordFieldValue(record, fieldName) {
   const map = {
     full_name: record.full_name,
@@ -42,7 +34,6 @@ async function createRequest(user, recordRef, payload) {
   const { changes, reason } = payload;
   const change = changes[0];
 
-  // ── Defense in depth: even though Zod validated, re-check allowlist ────
   if (!ALLOWED_CORRECTION_FIELDS.includes(change.fieldName)) {
     throw new ApiError(
       400,
@@ -52,19 +43,16 @@ async function createRequest(user, recordRef, payload) {
   }
 
   return withTransaction(async (conn) => {
-    // ── 1. Lock record row (serializes concurrent creates for this record) ──
     const record = await correctionRepo.findRecordByReferenceForUpdate(conn, recordRef);
 
     if (!record) {
       throw new ApiError(404, 'RECORD_NOT_FOUND', 'Record not found.');
     }
 
-    // ── 2. Ownership ─────────────────────────────────────────────────────────
     if (record.citizen_user_id !== user.id) {
       throw new ApiError(403, 'NOT_RECORD_OWNER', 'This record does not belong to you.');
     }
 
-    // ── 3. No-op detection ──────────────────────────────────────────────────
     const currentValue = getRecordFieldValue(record, change.fieldName);
 
     if (change.proposedValue === currentValue) {
@@ -75,7 +63,6 @@ async function createRequest(user, recordRef, payload) {
       );
     }
 
-    // ── 4. Duplicate pending request (same record + field) ───────────────────
     const existing = await correctionRepo.findPendingRequestForField(
       conn,
       record.id,
@@ -90,7 +77,6 @@ async function createRequest(user, recordRef, payload) {
       );
     }
 
-    // ── 5. Insert request — old_value & expected_version from DB ─────────────
     const requestId = await correctionRepo.insertRequest(conn, {
       citizenUserId: user.id,
       citizenRecordId: record.id,
@@ -102,7 +88,6 @@ async function createRequest(user, recordRef, payload) {
       expectedRecordVersion: record.record_version,
     });
 
-    // ── 6. Audit log — same transaction, same connection ─────────────────────
     await logAudit(conn, {
       actorUserId: user.id,
       action: 'REQUEST_SUBMITTED',
@@ -111,14 +96,35 @@ async function createRequest(user, recordRef, payload) {
       metadata: {
         recordId: record.id,
         fieldName: change.fieldName,
-        // NOTE: no names, no proposed values — pointers only
       },
     });
 
-    // ── 7. Return the inserted row (fetched inside the tx) ───────────────────
     const request = await correctionRepo.findRequestById(conn, requestId);
     return sanitize(request);
   });
 }
 
-module.exports = { createRequest };
+// ── M2.5: Citizen tracking ───────────────────────────────────
+
+async function listMyRequests(user) {
+  const rows = await correctionRepo.findByCitizenId(user.id);
+  return rows.map(sanitize);
+}
+
+async function getMyRequestById(user, requestId) {
+  const request = await correctionRepo.findByIdGlobal(requestId);
+
+  if (!request) {
+    throw new ApiError(404, 'REQUEST_NOT_FOUND', 'Request not found.');
+  }
+
+  // ⭐ Explicit ownership check — distinguishes "not found" (404) from
+  // "exists but not yours" (403), per Context.md §12 error catalog.
+  if (request.citizen_user_id !== user.id) {
+    throw new ApiError(403, 'NOT_REQUEST_OWNER', 'This request does not belong to you.');
+  }
+
+  return sanitize(request);
+}
+
+module.exports = { createRequest, listMyRequests, getMyRequestById };

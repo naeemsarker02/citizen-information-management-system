@@ -15,4 +15,23 @@ const create = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { create };
+const list = asyncHandler(async (req, res) => {
+  const requests = await correctionService.listMyRequests(req.user);
+  res.status(200).json({
+    success: true,
+    data: { requests },
+  });
+});
+
+const getOne = asyncHandler(async (req, res) => {
+  const request = await correctionService.getMyRequestById(
+    req.user,
+    req.validated.params.id
+  );
+  res.status(200).json({
+    success: true,
+    data: { request },
+  });
+});
+
+module.exports = { create, list, getOne };

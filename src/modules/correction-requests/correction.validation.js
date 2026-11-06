@@ -1,14 +1,6 @@
 const { z } = require('zod');
 const { ALLOWED_CORRECTION_FIELDS } = require('../../constants/allowed-fields');
 
-/**
- * Body schema for creating a correction request.
- *
- * ⚠️ `.strict()` is MANDATORY on every object — including nested `changes` items.
- * Zod default behavior silently STRIPS unknown keys. With `.strict()`, any
- * client-supplied `oldValue`, `citizenUserId`, `departmentId`, `status`,
- * `expectedRecordVersion` → 400 VALIDATION_ERROR (not silently accepted).
- */
 const createCorrectionSchema = z
   .object({
     changes: z
@@ -25,4 +17,10 @@ const createCorrectionSchema = z
   })
   .strict();
 
-module.exports = { createCorrectionSchema };
+const requestIdParamSchema = z
+  .object({
+    id: z.coerce.number().int().positive(),
+  })
+  .strict();
+
+module.exports = { createCorrectionSchema, requestIdParamSchema };
