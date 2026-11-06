@@ -7,6 +7,7 @@ const errorHandler = require('./middlewares/error-handler');
 const authRoutes = require('./modules/auth/auth.routes');
 const recordsRoutes = require('./modules/records/records.routes');
 const correctionRoutes = require('./modules/correction-requests/correction.routes');
+const correctionOfficerRoutes = require('./modules/correction-requests/correction.officer.routes');
 
 const app = express();
 
@@ -22,6 +23,7 @@ app.get('/api/health', (_req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/citizen', recordsRoutes);
 app.use('/api/citizen', correctionRoutes);
+app.use('/api/officer', correctionOfficerRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
