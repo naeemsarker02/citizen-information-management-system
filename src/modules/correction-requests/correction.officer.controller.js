@@ -23,4 +23,23 @@ const getOne = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { list, getOne };
+const decide = asyncHandler(async (req, res) => {
+  const request = await correctionService.decideRequest(
+    req.user,
+    req.validated.params.id,
+    req.validated.body
+  );
+
+  const message =
+    request.status === 'APPROVED'
+      ? 'Correction request approved.'
+      : 'Correction request rejected.';
+
+  res.status(200).json({
+    success: true,
+    message,
+    data: { request },
+  });
+});
+
+module.exports = { list, getOne, decide };

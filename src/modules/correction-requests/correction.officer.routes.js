@@ -5,6 +5,7 @@ const validate = require('../../middlewares/validate');
 const {
   requestIdParamSchema,
   officerListQuerySchema,
+  decisionSchema,
 } = require('./correction.validation');
 const controller = require('./correction.officer.controller');
 
@@ -24,6 +25,15 @@ router.get(
   authorize('OFFICER'),
   validate(requestIdParamSchema, 'params'),
   controller.getOne
+);
+
+router.patch(
+  '/correction-requests/:id/decision',
+  authenticate,
+  authorize('OFFICER'),
+  validate(requestIdParamSchema, 'params'),
+  validate(decisionSchema, 'body'),
+  controller.decide
 );
 
 module.exports = router;

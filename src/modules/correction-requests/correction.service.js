@@ -27,10 +27,6 @@ function sanitize(request) {
   };
 }
 
-/**
- * Officer view: includes citizen + record context needed to review the request.
- * Never includes password hashes or unrelated PII.
- */
 function sanitizeForOfficer(row) {
   const review = row.reviewed_by
     ? {
@@ -68,17 +64,13 @@ function sanitizeForOfficer(row) {
   };
 }
 
-/**
- * Explicit field → record-column map. Never use dynamic record[fieldName]
- * because a spoofed fieldName could read unintended columns.
- */
 function getRecordFieldValue(record, fieldName) {
   const map = { full_name: record.full_name };
   return map[fieldName];
 }
 
 // ════════════════════════════════════════════════════════════════
-// Citizen flows (M2.4, M2.5)
+// M2.4, M2.5 — Citizen flows
 // ════════════════════════════════════════════════════════════════
 
 async function createRequest(user, recordRef, payload) {
@@ -86,26 +78,18 @@ async function createRequest(user, recordRef, payload) {
   const change = changes[0];
 
   if (!ALLOWED_CORRECTION_FIELDS.includes(change.fieldName)) {
-    throw new ApiError(
-      400,
-      'UNSUPPORTED_FIELD',
-      `Field '${change.fieldName}' is not supported.`
-    );
+    throw new ApiError(400, 'UNSUPPORTED_FIELD', `Field '${change.fieldName}' is not supported.`);
   }
 
   return withTransaction(async (conn) => {
     const record = await correctionRepo.findRecordByReferenceForUpdate(conn, recordRef);
 
-    if (!record) {
-      throw new ApiError(404, 'RECORD_NOT_FOUND', 'Record not found.');
-    }
-
+    if (!record) throw new ApiError(404, 'RECORD_NOT_FOUND', 'Record not found.');
     if (record.citizen_user_id !== user.id) {
       throw new ApiError(403, 'NOT_RECORD_OWNER', 'This record does not belong to you.');
     }
 
     const currentValue = getRecordFieldValue(record, change.fieldName);
-
     if (change.proposedValue === currentValue) {
       throw new ApiError(
         400,
@@ -119,7 +103,6 @@ async function createRequest(user, recordRef, payload) {
       record.id,
       change.fieldName
     );
-
     if (existing) {
       throw new ApiError(
         409,
@@ -147,8 +130,8 @@ async function createRequest(user, recordRef, payload) {
       metadata: { recordId: record.id, fieldName: change.fieldName },
     });
 
-    const request = await correctionRepo.findRequestDetailByIdTx(conn, requestId);
-    return sanitize(request);
+    const final = await correctionRepo.findRequestDetailByIdTx(conn, requestId);
+    return sanitize(final);
   });
 }
 
@@ -159,19 +142,15 @@ async function listMyRequests(user) {
 
 async function getMyRequestById(user, requestId) {
   const request = await correctionRepo.findByIdGlobal(requestId);
-
-  if (!request) {
-    throw new ApiError(404, 'REQUEST_NOT_FOUND', 'Request not found.');
-  }
+  if (!request) throw new ApiError(404, 'REQUEST_NOT_FOUND', 'Request not found.');
   if (request.citizen_user_id !== user.id) {
     throw new ApiError(403, 'NOT_REQUEST_OWNER', 'This request does not belong to you.');
   }
-
   return sanitize(request);
 }
 
 // ════════════════════════════════════════════════════════════════
-// Officer flows (M3.1, M3.2) — read-only
+// M3.1, M3.2 — Officer read
 // ════════════════════════════════════════════════════════════════
 
 async function listForOfficer(officer, filters) {
@@ -184,12 +163,60 @@ async function listForOfficer(officer, filters) {
 
 async function getRequestForOfficer(officer, requestId) {
   const row = await correctionRepo.findRequestDetailById(requestId);
+  if (!row) throw new ApiError(404, 'REQUEST_NOT_FOUND', 'Request not found.');
+  if (row.department_id !== officer.departmentId) {
+    throw new ApiError(403, 'WRONG_DEPARTMENT', 'This request belongs to another department.');
+  }
+  return sanitizeForOfficer(row);
+}
 
-  if (!row) {
+// ════════════════════════════════════════════════════════════════
+// M3.4, M3.5 — Decision (approve + reject)
+// ════════════════════════════════════════════════════════════════
+
+/**
+ * Shared preflight inside the transaction:
+ *  - lock record (lock #1)
+ *  - lock request (lock #2)
+ *  - verify PENDING / dept / version / field / old_value (approve only for last two)
+ *
+ * Lock order is ALWAYS record → request to prevent deadlock.
+ */
+async function _lockAndValidate(officer, requestId) {
+  // We need a fresh connection each time. The caller wraps us in withTransaction,
+  // and we receive `conn` explicitly — see callers below.
+  throw new Error('_lockAndValidate must be called from within withTransaction');
+}
+
+async function _validateLockedEntities(conn, officer, requestId) {
+  // Step 1: non-locking read of citizen_record_id
+  const recordId = await correctionRepo.findRequestRecordId(conn, requestId);
+  if (!recordId) throw new ApiError(404, 'REQUEST_NOT_FOUND', 'Request not found.');
+
+  // Step 2: lock record (lock #1)
+  const record = await correctionRepo.lockRecordById(conn, recordId);
+  if (!record) {
+    throw new ApiError(404, 'RECORD_NOT_FOUND', 'Record not found.');
+  }
+
+  // Step 3: lock request (lock #2)
+  const request = await correctionRepo.lockRequestById(conn, requestId);
+  if (!request) {
+    // Should not happen because we just read it, but defensive.
     throw new ApiError(404, 'REQUEST_NOT_FOUND', 'Request not found.');
   }
 
-  if (row.department_id !== officer.departmentId) {
+  // Step 4: status must be PENDING
+  if (request.status !== 'PENDING') {
+    throw new ApiError(
+      409,
+      'REQUEST_ALREADY_PROCESSED',
+      'This correction request has already been finalized.'
+    );
+  }
+
+  // Step 5: department authorization
+  if (request.department_id !== officer.departmentId) {
     throw new ApiError(
       403,
       'WRONG_DEPARTMENT',
@@ -197,7 +224,107 @@ async function getRequestForOfficer(officer, requestId) {
     );
   }
 
-  return sanitizeForOfficer(row);
+  return { record, request };
+}
+
+async function approveRequest(officer, requestId) {
+  return withTransaction(async (conn) => {
+    const { record, request } = await _validateLockedEntities(conn, officer, requestId);
+
+    // Step 6: version snapshot must match current record version
+    if (request.expected_record_version !== record.record_version) {
+      throw new ApiError(
+        409,
+        'RECORD_STATE_CONFLICT',
+        'The record has been modified since this request was submitted.'
+      );
+    }
+
+    // Step 7: field allowlist + old_value must match current value
+    if (!ALLOWED_CORRECTION_FIELDS.includes(request.field_name)) {
+      throw new ApiError(
+        400,
+        'UNSUPPORTED_FIELD',
+        `Field '${request.field_name}' is not supported.`
+      );
+    }
+    const currentValue = getRecordFieldValue(record, request.field_name);
+    if (currentValue !== request.old_value) {
+      throw new ApiError(
+        409,
+        'RECORD_STATE_CONFLICT',
+        'The record value has changed since this request was submitted.'
+      );
+    }
+
+    // Step 8: update record + version bump
+    const updated = await correctionRepo.updateRecordFullName(
+      conn,
+      record.id,
+      request.proposed_value
+    );
+    if (!updated) {
+      throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to update record.');
+    }
+
+    // Step 9: mark request APPROVED
+    await correctionRepo.markRequestApproved(conn, requestId, officer.id);
+
+    // Step 10: audit — pointers only
+    await logAudit(conn, {
+      actorUserId: officer.id,
+      action: 'REQUEST_APPROVED',
+      entityType: 'correction_request',
+      entityId: requestId,
+      metadata: {
+        recordId: record.id,
+        prevVersion: record.record_version,
+        newVersion: record.record_version + 1,
+      },
+    });
+
+    // Return the freshly finalized request (inside the tx to see updated row)
+    const finalRow = await correctionRepo.findRequestDetailByIdTx(conn, requestId);
+    return sanitizeForOfficer(finalRow);
+  });
+}
+
+async function rejectRequest(officer, requestId, rejectionReason) {
+  return withTransaction(async (conn) => {
+    const { request } = await _validateLockedEntities(conn, officer, requestId);
+
+    // Steps 6 & 7 are intentionally SKIPPED for rejection.
+    // A rejected request does NOT modify the record, so a version/old-value
+    // conflict is not a reason to block the decision — the officer is
+    // finalizing the application, not applying it.
+
+    // Step 9 (reject branch): mark request REJECTED with reason
+    await correctionRepo.markRequestRejected(
+      conn,
+      requestId,
+      officer.id,
+      rejectionReason
+    );
+
+    // Step 10: audit — pointers only
+    await logAudit(conn, {
+      actorUserId: officer.id,
+      action: 'REQUEST_REJECTED',
+      entityType: 'correction_request',
+      entityId: requestId,
+      metadata: { recordId: request.citizen_record_id },
+    });
+
+    const finalRow = await correctionRepo.findRequestDetailByIdTx(conn, requestId);
+    return sanitizeForOfficer(finalRow);
+  });
+}
+
+async function decideRequest(officer, requestId, payload) {
+  if (payload.decision === 'APPROVED') {
+    return approveRequest(officer, requestId);
+  }
+  return rejectRequest(officer, requestId, payload.reason);
 }
 
 module.exports = {
@@ -208,6 +335,6 @@ module.exports = {
   // Officer read
   listForOfficer,
   getRequestForOfficer,
-  // Internal sanitizers re-exported for controller-level use if needed
-  _sanitizeForOfficer: sanitizeForOfficer,
+  // Officer decision
+  decideRequest,
 };

@@ -1,7 +1,7 @@
 const { pool } = require('../../config/database');
 
 // ════════════════════════════════════════════════════════════════
-// Record + request access (M2.4 transactional flow)
+// M2.4 — Record + request access (transactional create)
 // ════════════════════════════════════════════════════════════════
 
 async function findRecordByReferenceForUpdate(conn, recordRef) {
@@ -51,7 +51,7 @@ async function insertRequest(conn, data) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// Citizen tracking (M2.5)
+// M2.5 — Citizen tracking
 // ════════════════════════════════════════════════════════════════
 
 async function findByCitizenId(userId) {
@@ -85,17 +85,12 @@ async function findByIdGlobal(requestId) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// Officer views (M3.1, M3.2) — join with citizen + record for review context
+// M3.1, M3.2 — Officer read views
 // ════════════════════════════════════════════════════════════════
 
-/**
- * Officer list: department-scoped, optional status filter.
- * Uses req.user.departmentId — NOT a client-supplied department.
- */
 async function findByDepartment({ departmentId, status }) {
   const conditions = ['cr.department_id = ?'];
   const params = [departmentId];
-
   if (status) {
     conditions.push('cr.status = ?');
     params.push(status);
@@ -114,9 +109,9 @@ async function findByDepartment({ departmentId, status }) {
             rec.record_version AS record_current_version,
             reviewer.name      AS reviewer_name
      FROM correction_requests cr
-     JOIN users u           ON u.id = cr.citizen_user_id
-     JOIN citizen_records rec ON rec.id = cr.citizen_record_id
-     LEFT JOIN users reviewer ON reviewer.id = cr.reviewed_by
+     JOIN users u              ON u.id = cr.citizen_user_id
+     JOIN citizen_records rec  ON rec.id = cr.citizen_record_id
+     LEFT JOIN users reviewer  ON reviewer.id = cr.reviewed_by
      WHERE ${conditions.join(' AND ')}
      ORDER BY cr.submitted_at DESC, cr.id DESC`,
     params
@@ -124,13 +119,6 @@ async function findByDepartment({ departmentId, status }) {
   return rows;
 }
 
-/**
- * Officer detail: fetch by ID without department filter — so the service
- * can distinguish "not found" (404) from "wrong department" (403).
- *
- * Accepts either `pool` or a transaction `conn` as executor, so the same
- * shape is reusable inside M3.4 / M3.5 transactions.
- */
 async function _fetchDetail(executor, requestId) {
   const [rows] = await executor.query(
     `SELECT cr.id, cr.citizen_user_id, cr.citizen_record_id, cr.department_id,
@@ -145,9 +133,9 @@ async function _fetchDetail(executor, requestId) {
             rec.record_version AS record_current_version,
             reviewer.name      AS reviewer_name
      FROM correction_requests cr
-     JOIN users u           ON u.id = cr.citizen_user_id
-     JOIN citizen_records rec ON rec.id = cr.citizen_record_id
-     LEFT JOIN users reviewer ON reviewer.id = cr.reviewed_by
+     JOIN users u              ON u.id = cr.citizen_user_id
+     JOIN citizen_records rec  ON rec.id = cr.citizen_record_id
+     LEFT JOIN users reviewer  ON reviewer.id = cr.reviewed_by
      WHERE cr.id = ?
      LIMIT 1`,
     [requestId]
@@ -163,16 +151,101 @@ async function findRequestDetailByIdTx(conn, requestId) {
   return _fetchDetail(conn, requestId);
 }
 
+// ════════════════════════════════════════════════════════════════
+// M3.4, M3.5 — Decision transaction primitives
+// ════════════════════════════════════════════════════════════════
+
+/**
+ * Step 1 of decision flow: non-locking read of citizen_record_id.
+ * MUST NOT use FOR UPDATE — we need the record ID first to lock in the
+ * universal order (record → request). Locking the request here would
+ * violate that order.
+ */
+async function findRequestRecordId(conn, requestId) {
+  const [rows] = await conn.query(
+    'SELECT citizen_record_id FROM correction_requests WHERE id = ?',
+    [requestId]
+  );
+  return rows[0] ? rows[0].citizen_record_id : null;
+}
+
+/** Step 2: lock record row (lock #1). */
+async function lockRecordById(conn, recordId) {
+  const [rows] = await conn.query(
+    `SELECT id, citizen_user_id, department_id, record_type, record_reference,
+            full_name, date_of_birth, address, record_version
+     FROM citizen_records
+     WHERE id = ?
+     FOR UPDATE`,
+    [recordId]
+  );
+  return rows[0] || null;
+}
+
+/** Step 3: lock request row (lock #2). */
+async function lockRequestById(conn, requestId) {
+  const [rows] = await conn.query(
+    `SELECT id, citizen_user_id, citizen_record_id, department_id,
+            field_name, old_value, proposed_value, reason,
+            expected_record_version, status,
+            reviewed_by, reviewed_at, rejection_reason
+     FROM correction_requests
+     WHERE id = ?
+     FOR UPDATE`,
+    [requestId]
+  );
+  return rows[0] || null;
+}
+
+/** Step 8 (approve only): update record column + bump version atomically. */
+async function updateRecordFullName(conn, recordId, newFullName) {
+  const [result] = await conn.query(
+    `UPDATE citizen_records
+     SET full_name = ?, record_version = record_version + 1
+     WHERE id = ?`,
+    [newFullName, recordId]
+  );
+  return result.affectedRows === 1;
+}
+
+/** Step 9 (approve): finalize request as APPROVED. */
+async function markRequestApproved(conn, requestId, reviewerId) {
+  await conn.query(
+    `UPDATE correction_requests
+     SET status = 'APPROVED', reviewed_by = ?, reviewed_at = NOW()
+     WHERE id = ?`,
+    [reviewerId, requestId]
+  );
+}
+
+/** Step 9 (reject): finalize request as REJECTED with reason. */
+async function markRequestRejected(conn, requestId, reviewerId, rejectionReason) {
+  await conn.query(
+    `UPDATE correction_requests
+     SET status = 'REJECTED', reviewed_by = ?, reviewed_at = NOW(),
+         rejection_reason = ?
+     WHERE id = ?`,
+    [reviewerId, rejectionReason, requestId]
+  );
+}
+
 module.exports = {
-  // M2.4 transactional
+  // M2.4
   findRecordByReferenceForUpdate,
   findPendingRequestForField,
   insertRequest,
-  // M2.5 citizen tracking
+  // M2.5
   findByCitizenId,
   findByIdGlobal,
-  // M3.1, M3.2 officer views
+  // M3.1, M3.2
   findByDepartment,
   findRequestDetailById,
   findRequestDetailByIdTx,
+  // M3.4, M3.5
+  findRequestRecordId,
+  lockRecordById,
+  lockRequestById,
+  updateRecordFullName,
+  markRequestApproved,
+  markRequestRejected,
 };
