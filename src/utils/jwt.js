@@ -1,10 +1,9 @@
-
 const jwt = require('jsonwebtoken');
 const env = require('../config/env');
 
 function signToken({ sub }) {
     return jwt.sign(
-        { sub },
+        { sub: String(sub) },
         env.jwt.secret,
         {
             expiresIn: env.jwt.expiresIn,
