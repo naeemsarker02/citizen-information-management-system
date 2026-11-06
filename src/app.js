@@ -5,6 +5,7 @@ const helmet = require('helmet');
 const notFound = require('./middlewares/not-found');
 const errorHandler = require('./middlewares/error-handler');
 const authRoutes = require('./modules/auth/auth.routes');
+const recordsRoutes = require('./modules/records/records.routes');
 
 const app = express();
 
@@ -21,7 +22,7 @@ app.get('/api/health', (_req, res) => {
 
 // ── API routes ────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
-
+app.use('/api/citizen', recordsRoutes);
 // ── 404 + error handler (must be last) ────────────────────
 app.use(notFound);
 app.use(errorHandler);
