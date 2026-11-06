@@ -7,7 +7,7 @@
     "test": "tests"
   },
   "scripts": {
-    "test": "jest --runInBand",
+    "test": "jest --runInBand --forceExit",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "dev": "nodemon src/server.js",
