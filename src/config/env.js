@@ -42,7 +42,14 @@ const envSchema = z.object({
         .string()
         .min(32, 'JWT_SECRET must contain at least 32 characters'),
 
-    JWT_EXPIRES_IN: z.string().trim().min(1).default('2h'),
+    JWT_EXPIRES_IN: z
+        .string()
+        .trim()
+        .regex(
+            /^[1-9]\d*(ms|s|m|h|d|w|y)$/i,
+            'JWT_EXPIRES_IN must be a valid duration, such as 2h or 30m'
+        )
+        .default('2h'),
 }).strict();
 
 // 3. Pick only the variables used by this application.
