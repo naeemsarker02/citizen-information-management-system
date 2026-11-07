@@ -2,9 +2,28 @@
 
 A small backend prototype built for **Credosis Phase 02 — From Idea to Demo** (Backend Engineer Intern track). It demonstrates one workflow end-to-end: a citizen submits a correction request for one of their identity records, and a department officer reviews and decides on it.
 
-Everything runs locally with fictional data. No government API, no real NID, no production database — just a focused backend that shows how a correction workflow can be structured safely with transactions, validation, and audit logging.
+Everything runs on fictional data. No government API, no real NID, no production user data — just a focused backend that shows how a correction workflow can be structured safely with transactions, validation, and audit logging.
 
-**Stack:** Node.js 24 · Express 5 · MySQL 8 · JWT · Zod · Swagger UI
+**Stack:** Node.js · Express 5 · MySQL 8 · JWT · Zod · Swagger UI
+**Deployed on:** Render (API) + Aiven (MySQL, managed)
+
+---
+
+## 🚀 Live Demo
+
+**[Open the live Swagger UI →](https://citizen-information-management-system.onrender.com/api-docs)**
+
+- **API base URL:** `https://citizen-information-management-system.onrender.com`
+- **Health check:** [`/api/health`](https://citizen-information-management-system.onrender.com/api/health)
+- **Interactive docs:** [`/api-docs`](https://citizen-information-management-system.onrender.com/api-docs)
+
+Log in with any of the [demo accounts](#demo-accounts) — click **Authorize** with the returned token, and every endpoint becomes clickable. The full correction workflow runs against the live Aiven database, not a mock.
+
+> **Cold start notice:** Render's free tier puts the service to sleep after 15 minutes of inactivity. The first request after a sleep can take 30–60 seconds. If a request times out, wait a moment and reload.
+
+### Want to run it locally instead?
+
+Everything works from a clean clone — see [Running it locally](#running-it-locally). Same codebase, same behavior, your own MySQL instance.
 
 ---
 
@@ -73,7 +92,6 @@ The demo also doesn't include a frontend — Swagger UI is the interface. Review
 
 The codebase is a modular monolith with a clear layered split. Each layer has one job and knows nothing about the layer above it:
 
-
 ```
 HTTP client (Swagger / Postman / curl)
         ↓
@@ -122,16 +140,18 @@ A couple of design decisions worth calling out, because they're the ones that wo
 
 ## Running it locally
 
+If you've already tried the live demo and want to poke at the code, this section gets you a working copy in about five minutes. If you only want to see the API work, the [live demo](#-live-demo) is faster.
+
 ### You'll need
 
-- **Node.js 24 LTS** (22 also works; 20 is end-of-life and not supported)
+- **Node.js 20+** (24 LTS recommended; 22 also works)
 - **MySQL 8.0.16+** (CHECK constraints must actually enforce — older versions silently ignore them, which breaks a core invariant)
 - **Git**
 
 ### Setup
 
 ```bash
-git clone <your-repo-url> cims-backend
+git clone https://github.com/naeemsarker02/citizen-information-management-system.git cims-backend
 cd cims-backend
 npm install
 ```
@@ -142,9 +162,11 @@ Copy the environment template and fill it in:
 cp .env.example .env
 ```
 
+> On Windows PowerShell: `Copy-Item .env.example .env`
+
 Open `.env` and set two things:
 
-- `DB_PASSWORD` — your local MySQL password
+- `DB_PASSWORD` — your local MySQL password (leave empty if your root user has no password)
 - `JWT_SECRET` — a random string of at least 32 characters
 
 To generate a secret quickly:
@@ -189,7 +211,7 @@ Open **http://localhost:5000/api-docs** for the interactive API.
 
 ## Demo accounts
 
-All fictional, all local-only. Do not reuse these anywhere real.
+All fictional, all local-only. Do not reuse these anywhere real. Same accounts work on both the live and local deployments.
 
 | Role | Email | Password |
 |---|---|---|
@@ -242,7 +264,10 @@ Error codes are stable strings — `INVALID_CREDENTIALS`, `NOT_RECORD_OWNER`, `D
 
 ## Try it in Swagger
 
-Once the server is running, open `/api-docs`. Then:
+**Live:** [https://citizen-information-management-system.onrender.com/api-docs](https://citizen-information-management-system.onrender.com/api-docs)
+**Local:** `http://localhost:5000/api-docs` (after `npm run dev`)
+
+Both work identically. Then:
 
 1. `POST /auth/login` — use the citizen account — copy `data.token`
 2. Click **Authorize** at the top, paste the token, click Authorize
@@ -267,6 +292,8 @@ That full loop — citizen submits, officer decides, citizen verifies — is the
 - `reason` is required
 - The record is **not** modified
 - The rejection reason is stored on the request and visible to the citizen on their next fetch
+
+> **On the live deployment:** the Aiven database is shared, so if someone has already run the workflow above, `BR-1001` may already show `"Demo Citizen"` at version `2`. Running a new correction against it still works — the flow just starts from whatever state is currently in the DB.
 
 ---
 
@@ -324,14 +351,14 @@ mysql -u root -p cims_db < database/reset-hard.sql
 
 The honest list:
 
-1. **Local prototype only** — not connected to any real government system, no authorization claimed, no real citizen data used anywhere
+1. **Prototype-grade deployment** — Render free tier (cold starts) + Aiven free tier (shared service, limited storage). Real deployment would use managed infrastructure with monitoring, backups, and a private VPC.
 2. **Fictional accounts and records** — see the demo table above; none of it maps to real people
 3. **Only `full_name` is correctable** — adding fields is a deliberate future step, not an oversight
 4. **No registration flow** — accounts are seeded, not created
 5. **Single-officer decision** — no escalation or multi-level review
 6. **Per-request DB lookup in auth** — the trade-off described above; production would add a short-TTL cache
 7. **No document upload or evidence attachment** — the workflow accepts a text reason, not files
-8. **Prototype-grade security** — bcrypt + JWT + Zod + parameterized SQL cover the basics, but this isn't audited for production use
+8. **Not connected to any real government system** — no integration, no authorization claimed, no production security audit
 
 ## If this grew up
 
@@ -365,7 +392,7 @@ cims-backend/
 │   ├── server.js                ← startup + graceful shutdown
 │   ├── config/
 │   │   ├── env.js               ← Zod-validated env config
-│   │   └── database.js          ← mysql2 pool
+│   │   └── database.js          ← mysql2 pool (with optional SSL for hosted DB)
 │   ├── middlewares/
 │   │   ├── authenticate.js      ← JWT verify + fresh user load
 │   │   ├── authorize.js         ← role gate
@@ -410,5 +437,4 @@ If you're reviewing this: thanks for reading. If something's unclear or looks wr
 
 ---
 
-**Credosis disclaimer:** This repository is a recruitment-evaluation prototype. It is not an official government system, is not connected to any real government database or API, and contains no real personal data. Approved corrections modify only the local MySQL instance on the developer's machine. Any real deployment would require official authorization, approved interfaces, legal and privacy review, and production security controls.
-# citizen-information-management-system
+**Credosis disclaimer:** This repository is a recruitment-evaluation prototype. It is not an official government system, is not connected to any real government database or API, and contains no real personal data. Approved corrections modify only the deployed Aiven MySQL instance or a local copy on the developer's machine. Any real deployment would require official authorization, approved interfaces, legal and privacy review, and production security controls.
