@@ -411,3 +411,4 @@ If you're reviewing this: thanks for reading. If something's unclear or looks wr
 ---
 
 **Credosis disclaimer:** This repository is a recruitment-evaluation prototype. It is not an official government system, is not connected to any real government database or API, and contains no real personal data. Approved corrections modify only the local MySQL instance on the developer's machine. Any real deployment would require official authorization, approved interfaces, legal and privacy review, and production security controls.
+# citizen-information-management-system
