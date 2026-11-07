@@ -22,8 +22,10 @@ const spec = {
       '3. Try `GET /api/citizen/records`\n' +
       '4. Login as officer → re-Authorize → `PATCH /api/officer/correction-requests/{id}/decision`',
   },
-  servers: [{ url: 'http://localhost:5000', description: 'Local development' }],
-
+  
+servers: [
+    { url: '/', description: 'Current origin — works locally and on Render' }
+],
   tags: [
     { name: 'Health', description: 'Server status' },
     { name: 'Auth', description: 'Login and current user' },
