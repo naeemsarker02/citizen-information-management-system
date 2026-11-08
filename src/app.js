@@ -13,7 +13,6 @@ const correctionOfficerRoutes = require('./modules/correction-requests/correctio
 
 const app = express();
 
-// ── Swagger UI (mounted BEFORE helmet) ────────────────────
 // Helmet's default CSP blocks Swagger UI's inline scripts. Since /api-docs
 // serves only static documentation (no user data), it is safe to bypass
 // helmet on this specific route.
@@ -28,27 +27,23 @@ app.use(
   })
 );
 
-// Redirect /docs → /api-docs (convenience)
 app.get('/docs', (_req, res) => res.redirect('/api-docs'));
+app.get('/', (_req, res) => res.redirect('/api-docs'));
 
-// ── Global middleware (all API routes) ────────────────────
 app.use(helmet());
 app.use(cors());
 app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 
-// ── Health ────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => {
   res.status(200).json({ success: true, message: 'CIMS API is running' });
 });
 
-// ── API routes ────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
 app.use('/api/citizen', recordsRoutes);
 app.use('/api/citizen', correctionRoutes);
 app.use('/api/officer', correctionOfficerRoutes);
 
-// ── 404 + error handler ───────────────────────────────────
 app.use(notFound);
 app.use(errorHandler);
 

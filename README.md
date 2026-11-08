@@ -13,7 +13,7 @@ Everything runs on fictional data. No government API, no real NID, no production
 
 **[Open the live Swagger UI →](https://citizen-information-management-system.onrender.com/api-docs)**
 
-- **API base URL:** `https://citizen-information-management-system.onrender.com`
+- - **API base URL:** `https://citizen-information-management-system.onrender.com` (try [`/api-docs`](https://citizen-information-management-system.onrender.com/api-docs))
 - **Health check:** [`/api/health`](https://citizen-information-management-system.onrender.com/api/health)
 - **Interactive docs:** [`/api-docs`](https://citizen-information-management-system.onrender.com/api-docs)
 
@@ -251,10 +251,8 @@ Base path: `/api`
 Every response uses the same envelope:
 
 ```json
-// success
 { "success": true, "message": "...", "data": { ... } }
 
-// error
 { "success": false, "error": { "code": "VALIDATION_ERROR", "message": "...", "details": [] } }
 ```
 
