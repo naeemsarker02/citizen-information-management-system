@@ -30,6 +30,74 @@ Everything runs on fictional data. No government API, no real NID, no production
 
 ---
 
+## ⚡ Quick Start — Try It in 5 Minutes
+
+The live API is ready. Open Swagger UI, log in, run the full workflow — no setup required.
+
+**🔗 Live Swagger UI:** https://citizen-information-management-system.onrender.com/api-docs
+
+**Password for every account:** `Demo@12345`
+
+### All Demo Accounts (fictional, local-only)
+
+**Citizens:**
+
+| Name | Email | Records | Scenario |
+|---|---|---|---|
+| **Md. Rakib Hossain** | `citizen@example.com` | BR-1001 *(typo)*, NID-1001 | Fresh typo to correct |
+| **Fatima Akter** | `fatima@example.com` | BR-1002 *(typo)*, NID-1002 | Has a pending request for officer review |
+| **Mohammad Tanvir Ahmed** | `tanvir@example.com` | BR-1003 *(corrected)*, NID-1003 | Already-corrected history |
+| **Sadia Islam** | `sadia@example.com` | BR-1004, NID-1004 | Clean records (baseline) |
+
+**Officers:**
+
+| Name | Email | Department |
+|---|---|---|
+| **Birth Officer** | `officer.birth@example.com` | Birth Registration |
+| **Rafiq Uddin** | `officer.rafiq@example.com` | Birth Registration |
+| **NID Officer** | `officer.nid@example.com` | NID |
+| **Abdur Rahman** | `officer.rahman@example.com` | NID |
+
+### Three Quick Tests
+
+**Test 1 — Approve a pending request (~60 sec)**
+
+1. Login as `officer.rafiq@example.com` → copy token → **Authorize**
+2. `GET /officer/correction-requests?status=PENDING` → sees Fatima's pending BR-1002
+3. `PATCH /officer/correction-requests/{id}/decision` with `{"decision": "APPROVED"}`
+4. Login as `fatima@example.com` → `GET /citizen/records` → BR-1002 now shows `"Fatima Akter"`, version `2`
+
+**Test 2 — Fresh correction (~90 sec)**
+
+1. Login as `citizen@example.com` → `GET /citizen/records` → see BR-1001 with typo `"Md. Rakib Hasan"`
+2. `POST /citizen/records/BR-1001/correction-requests` with:
+   ```json
+   {
+     "changes": [{"fieldName": "full_name", "proposedValue": "Md. Rakib Hossain"}],
+     "reason": "Surname spelling correction — align with NID"
+   }
+   ```
+3. Login as `officer.birth@example.com` → `PATCH .../decision` with `{"decision": "APPROVED"}`
+4. Login back as `citizen@example.com` → `GET /citizen/records` → BR-1001 now shows `"Md. Rakib Hossain"`, version `2`
+
+**Test 3 — Try to break the workflow (~60 sec)**
+
+1. Login as `tanvir@example.com` → try to access Fatima's record: `GET /citizen/records/BR-1002` → **`403 NOT_RECORD_OWNER`**
+2. Try an officer endpoint: `GET /officer/correction-requests` → **`403 FORBIDDEN`**
+3. Login as `officer.birth@example.com` → try to approve an NID request → **`403 WRONG_DEPARTMENT`**
+4. Approve a request that's already approved → **`409 REQUEST_ALREADY_PROCESSED`**
+
+### What each account demonstrates
+
+- **Rakib** — the main "before" scenario: typo exists, ready to fix
+- **Fatima** — historical pending request; officer approval queued
+- **Tanvir** — historical approved + rejected requests; shows audit trail
+- **Sadia** — clean baseline; no corrections needed
+- **Birth Officer** / **Rafiq** — see Birth Registration department requests only
+- **NID Officer** / **Abdur Rahman** — see NID department requests only
+
+---
+
 ## Table of Contents
 
 1. [Project Overview](#1-project-overview)
@@ -793,8 +861,10 @@ npm run db:schema
 ## Step 5 — Seed the Demo Data
 
 ```bash
-npm run db:seed
+npm run db:seed -- --reset
 ```
+
+This seeds 8 users (4 citizens + 4 officers), 8 citizen records, and 3 historical correction requests.
 
 ## Step 6 — Start the Server
 
@@ -821,20 +891,40 @@ All fictional, all local-only. Do not reuse these anywhere real.
 
 The same accounts work on both the live and local deployments.
 
-| Role | Email | Password |
-|---|---|---|
-| Citizen | `citizen@example.com` | `Demo@12345` |
-| Birth Registration Officer | `officer.birth@example.com` | `Demo@12345` |
-| NID Officer | `officer.nid@example.com` | `Demo@12345` |
+**Password for every account:** `Demo@12345`
 
-## Seeded Citizen Records
+### Citizens
 
-Two seeded records, both owned by the same citizen:
-
-| Reference | Type | Current Name | Department |
+| Name | Email | Records | Scenario |
 |---|---|---|---|
-| `BR-1001` | BIRTH_REGISTRATION | **`Md. Rakib Hasan`** *(typo — this is the point)* | Birth Registration |
-| `NID-1001` | NID | `Md. Rakib Hossain` | NID |
+| **Md. Rakib Hossain** | `citizen@example.com` | `BR-1001` *(typo: "Md. Rakib Hasan")*, `NID-1001` | Fresh typo to correct |
+| **Fatima Akter** | `fatima@example.com` | `BR-1002` *(typo: "Fatema Akhter")*, `NID-1002` | Has a pending correction request |
+| **Mohammad Tanvir Ahmed** | `tanvir@example.com` | `BR-1003` *(already corrected, v2)*, `NID-1003` | Shows historical approval + rejection |
+| **Sadia Islam** | `sadia@example.com` | `BR-1004`, `NID-1004` | Clean records (baseline) |
+
+### Officers
+
+| Name | Email | Department |
+|---|---|---|
+| **Birth Officer** | `officer.birth@example.com` | Birth Registration |
+| **Rafiq Uddin** | `officer.rafiq@example.com` | Birth Registration |
+| **NID Officer** | `officer.nid@example.com` | NID |
+| **Abdur Rahman** | `officer.rahman@example.com` | NID |
+
+### Seeded Citizen Records
+
+Eight records across four citizens:
+
+| Reference | Type | Owner | Current Name | Dept |
+|---|---|---|---|---|
+| `BR-1001` | BIRTH_REGISTRATION | Rakib | **`Md. Rakib Hasan`** *(typo — the point)* | Birth Registration |
+| `NID-1001` | NID | Rakib | `Md. Rakib Hossain` | NID |
+| `BR-1002` | BIRTH_REGISTRATION | Fatima | **`Fatema Akhter`** *(typo — has PENDING request)* | Birth Registration |
+| `NID-1002` | NID | Fatima | `Fatima Akter` | NID |
+| `BR-1003` | BIRTH_REGISTRATION | Tanvir | `Mohammad Tanvir Ahmed` *(corrected at v2)* | Birth Registration |
+| `NID-1003` | NID | Tanvir | `Mohammad Tanvir Ahmed` *(rejection history)* | NID |
+| `BR-1004` | BIRTH_REGISTRATION | Sadia | `Sadia Islam` | Birth Registration |
+| `NID-1004` | NID | Sadia | `Sadia Islam` | NID |
 
 The typo in `BR-1001` is intentional. Without it, there's nothing to correct.
 
@@ -897,6 +987,8 @@ Every response uses the same envelope.
 
 Both work identically.
 
+> **Looking for a quick path?** See the [three quick tests](#-quick-start--try-it-in-5-minutes) at the top of this file — approve a pending request, run a fresh correction, or try to break the workflow. Each takes 60–90 seconds.
+
 ## Run the Complete Correction Workflow
 
 ### 1. Authenticate as Citizen
@@ -905,7 +997,7 @@ Execute:
 
 `POST /auth/login`
 
-Use the citizen account and copy `data.token`.
+Use the citizen account (`citizen@example.com` / `Demo@12345`) and copy `data.token`.
 
 ### 2. Authorize Swagger
 
@@ -955,7 +1047,7 @@ Execute:
 
 `GET /officer/correction-requests?status=PENDING`
 
-You'll see the request belonging to that officer's department.
+You'll see the request belonging to that officer's department (and possibly Fatima's pre-seeded pending request on `BR-1002`).
 
 ### 7. Approve the Request
 
@@ -1037,16 +1129,16 @@ npm run db:seed
 - Doesn't touch `correction_requests` or `audit_logs`.
 - Safe to run during development whenever you want.
 
-## Mode 2 — Restore Demo Values, Keep History
+## Mode 2 — Full Reset (recommended for fresh demo)
 
 ```bash
 npm run db:seed -- --reset
 ```
 
-- Resets `BR-1001.full_name = "Md. Rakib Hasan"` and both records' `record_version = 1`.
-- Keeps request and audit history.
-- Aborts if any `PENDING` requests exist — you need to finalize those first through the normal workflow.
-- This is the mode to use if you want to re-run the demo without losing the audit trail.
+- Wipes `correction_requests` and `audit_logs` for correction entities.
+- Restores all 8 records to baseline `full_name` and `record_version = 1` (except `BR-1003`, which stays at `version 2` because it represents a historical approval).
+- Re-seeds 3 historical requests: 1 PENDING (Fatima), 1 APPROVED (Tanvir), 1 REJECTED (Tanvir), each with matching audit entries.
+- Use this before recording a fresh demo.
 
 ## Mode 3 — Clean Slate for Video
 
@@ -1054,14 +1146,14 @@ npm run db:seed -- --reset
 mysql -u root -p cims_db < database/reset-hard.sql
 ```
 
-This wipes `correction_requests` and `audit_logs` entirely.
+This wipes `correction_requests` and `audit_logs` entirely (no historical requests re-seeded).
 
 It also:
 
 - Resets records to baseline.
 - Resets auto-increment counters so the next submission starts at `id = 1`.
 
-Only run this immediately before recording the walkthrough, when you want Swagger UI to look pristine.
+Only run this immediately before recording if you want Swagger UI to look completely pristine (no historical requests).
 
 **Not for development.**
 
