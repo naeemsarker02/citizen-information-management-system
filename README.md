@@ -7,7 +7,19 @@ Everything runs on fictional data. No government API, no real NID, no production
 **Stack:** Node.js · Express 5 · MySQL 8 · JWT · Zod · Swagger UI
 **Deployed on:** Render (API) + Aiven (MySQL, managed)
 
-## Live Demo
+---
+
+## 🎥 Video Walkthrough
+
+**[Watch the .-minute walkthrough →](youtube link)**
+
+
+
+Covers: the problem, the live demo, the technical decisions, and one thing I'd change if I started over.
+
+---
+
+## 🚀 Live Demo
 
 The API is deployed on Render (Node.js) with MySQL on Aiven. The easiest way to explore it is Swagger UI — it's interactive, so you can browse and execute every endpoint directly from the browser.
 
@@ -86,39 +98,249 @@ The demo also doesn't include a frontend — Swagger UI is the interface. Review
 
 ---
 
-## How it's organized
+## Architecture
 
-The codebase is a modular monolith with a clear layered split. Each layer has one job and knows nothing about the layer above it:
+The codebase is a **modular monolith with layered architecture**. Each layer owns one job and knows nothing about the layer above it.
 
 ```
-HTTP client (Swagger / Postman / curl)
-        ↓
-Routes          →  URL + middleware chain
-        ↓
-Middleware      →  auth, authorize, validate
-        ↓
-Controllers     →  HTTP request/response only
-        ↓
-Services        →  business rules, ownership, transactions
-        ↓
-Repositories    →  parameterized SQL
-        ↓
-MySQL 8
+┌──────────────────────────────────────────────────────────────────┐
+│  HTTP Clients                                                    │
+│  Swagger UI  ·  Postman  ·  curl                                 │
+└────────────────────────────┬─────────────────────────────────────┘
+                             │  HTTPS · JSON · JWT Bearer
+                             ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  Express 5 Application                                           │
+│                                                                  │
+│    ┌──────────────────────────────────────────────────────────┐  │
+│    │  Global middleware  —  helmet · cors · json · urlencoded  │  │
+│    └───────────────────────────┬──────────────────────────────┘  │
+│                                ▼                                 │
+│    ┌──────────────────────────────────────────────────────────┐  │
+│    │  Router  —  /api/auth  ·  /api/citizen  ·  /api/officer  │  │
+│    └───────────────────────────┬──────────────────────────────┘  │
+│                                ▼                                 │
+│    ┌──────────────────────────────────────────────────────────┐  │
+│    │  Request middleware chain                                │  │
+│    │  authenticate  →  authorize  →  validate                 │  │
+│    │  (JWT + DB)      (role check)   (Zod strict)             │  │
+│    └───────────────────────────┬──────────────────────────────┘  │
+│                                ▼                                 │
+│    ┌──────────────────────────────────────────────────────────┐  │
+│    │  Controller    HTTP in / out only — no SQL, no rules     │  │
+│    └───────────────────────────┬──────────────────────────────┘  │
+│                                ▼                                 │
+│    ┌──────────────────────────────────────────────────────────┐  │
+│    │  Service       business rules · ownership · transactions │  │
+│    └───────────────────────────┬──────────────────────────────┘  │
+│                                ▼                                 │
+│    ┌──────────────────────────────────────────────────────────┐  │
+│    │  Repository    parameterized SQL ( ? placeholders only ) │  │
+│    └───────────────────────────┬──────────────────────────────┘  │
+│                                ▼                                 │
+│    ┌──────────────────────────────────────────────────────────┐  │
+│    │  mysql2/promise pool  —  10 connections · SSL in prod    │  │
+│    └───────────────────────────┬──────────────────────────────┘  │
+└────────────────────────────────┼─────────────────────────────────┘
+                                 │  TCP · SSL
+                                 ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  MySQL 8  (InnoDB · Aiven managed)                               │
+│  5 tables · composite FK · CHECK constraints · version control   │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
-A few rules I kept strict throughout:
+**Three rules enforced throughout:**
 
-- Controllers never write SQL. Services never touch `req`/`res`. Repositories never decide HTTP status codes. If a decision felt like it belonged in two layers, the layer boundary made the call.
-- Business logic that depends on a database read (ownership, duplicate checks, version comparison) always happens inside the service, using data the repository returned. This means the check and the action are in the same code path — not spread across middleware and controller.
-- Every database write inside a transaction uses the transaction's connection. If a helper needs a connection, it takes it as a parameter. No silent fallbacks to the pool.
+- **Controllers never write SQL. Services never touch `req`/`res`. Repositories never decide HTTP status codes.** If a decision felt like it belonged to two layers, the layer boundary made the call.
+- **Business logic that depends on a DB read** (ownership, duplicate checks, version comparison) always happens **inside the service**, using data the repository returned. The check and the action live in the same code path — not spread across middleware and controller.
+- **Every DB write inside a transaction uses the transaction's connection.** If a helper needs a connection, it takes it as a parameter. No silent fallbacks to the pool.
 
 ---
 
-## Database
+## Data flow — correction request lifecycle
 
-Five tables. Small on purpose, but every constraint matters:
+A single correction request passes through three phases. The key design principle: **the client provides intent (what to change and why); the server derives all state (who owns the record, what the old value is, what the expected version is).**
 
-| Table | What it holds |
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  PHASE 1 — CITIZEN SUBMITS                                      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   Client  ──►  POST /api/citizen/records/BR-1001/               │
+│                     correction-requests                         │
+│                { changes, reason }  +  JWT                      │
+│                                                                 │
+│                     ▼                                           │
+│   authenticate  ────►  JWT verify · DB query for fresh user     │
+│   authorize     ────►  role === CITIZEN                         │
+│   validate      ────►  Zod .strict() on params + body           │
+│                                                                 │
+│                     ▼                                           │
+│   Service — withTransaction():                                  │
+│     BEGIN                                                       │
+│     • LOCK citizen_records row (FOR UPDATE)                     │
+│     • Verify ownership                                          │
+│     • No-op check (proposed ≠ current)                          │
+│     • Duplicate check (no PENDING for same record+field)        │
+│     • INSERT correction_requests  (PENDING)                     │
+│          old_value ← record.full_name       (from DB)           │
+│          expected_record_version ← record.record_version        │
+│     • INSERT audit_logs  { action: 'REQUEST_SUBMITTED' }        │
+│     COMMIT                                                      │
+│                                                                 │
+│                     ▼                                           │
+│   201 Created  { request: { id, status: 'PENDING' } }           │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  PHASE 2 — OFFICER DECIDES                                      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   Client  ──►  PATCH /api/officer/correction-requests/1/        │
+│                       decision                                  │
+│                { decision: "APPROVED" }  +  JWT                 │
+│                                                                 │
+│                     ▼                                           │
+│   authenticate  →  authorize(OFFICER)  →  validate              │
+│                                                                 │
+│                     ▼                                           │
+│   Service — withTransaction():                                  │
+│     BEGIN                                                       │
+│     • Non-locking read: request.citizen_record_id               │
+│     • LOCK citizen_records  (lock #1)                           │
+│     • LOCK correction_requests  (lock #2)                       │
+│          ⚠ uniform order — record then request                  │
+│     • Verify status = PENDING                                   │
+│     • Verify department matches                                 │
+│     • Verify expected_record_version = current version          │
+│          → else 409 RECORD_STATE_CONFLICT                       │
+│     • UPDATE citizen_records  (full_name, record_version + 1)   │
+│     • UPDATE correction_requests  (APPROVED, reviewer, ts)      │
+│     • INSERT audit_logs  { action: 'REQUEST_APPROVED' }         │
+│     COMMIT                                                      │
+│                                                                 │
+│                     ▼                                           │
+│   200 OK  { request: { status: 'APPROVED',                      │
+│                        record: { newVersion: 2 } } }            │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  PHASE 3 — CITIZEN VERIFIES                                     │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   GET /api/citizen/correction-requests/1                        │
+│     → status: APPROVED · reviewedBy · reviewedAt                │
+│                                                                 │
+│   GET /api/citizen/records                                      │
+│     → BR-1001.full_name = "Md. Rakib Hossain"                   │
+│     → BR-1001.record_version = 2                                │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+
+  ┌─────────────────────── TRUST BOUNDARY ───────────────────────┐
+  │                                                              │
+  │  Client sends:      field_name · proposed_value · reason     │
+  │                                                              │
+  │  Server derives:    old_value · expected_record_version ·    │
+  │                     citizen_user_id (from JWT) ·             │
+  │                     department_id (from record) ·            │
+  │                     status = PENDING · reviewer info         │
+  │                                                              │
+  │  → Client cannot manipulate workflow state or spoof history  │
+  │                                                              │
+  └──────────────────────────────────────────────────────────────┘
+```
+
+**Rejection works the same way, except:** `reason` is required, the record is **not** modified, and the rejection reason is stored on the request and visible to the citizen on their next fetch.
+
+---
+
+## Database schema
+
+Five tables. Small on purpose, but every constraint carries real weight.
+
+```
+┌─────────────────┐                  ┌───────────────────────┐
+│  departments    │                  │    audit_logs         │
+├─────────────────┤                  ├───────────────────────┤
+│ id       PK     │                  │ id               PK   │
+│ code     UNIQUE │                  │ actor_user_id    FK ──┐│
+│ name            │                  │ action                ││
+│ is_active       │                  │ entity_type           ││
+│ created_at      │                  │ entity_id             ││
+└────────┬────────┘                  │ metadata (JSON)       ││
+         │ 1:N                        │ created_at            ││
+         ▼                            └───────────────────────┘│
+┌─────────────────┐                          ▲                │
+│     users       │                          │                │
+├─────────────────┤                          │                │
+│ id       PK     │◄─────────────────────────┼────────────────┘
+│ name            │         actor            │
+│ email    UNIQUE │                          │
+│ password_hash   │                          │
+│ role     ENUM   │      ┌───────────────────┘
+│   CITIZEN/      │      │  reviewed_by
+│   OFFICER       │      │
+│ department_id FK│      │
+│ is_active       │      │
+│ created_at      │      │
+│ updated_at      │      │
+└────────┬────────┘      │
+         │ 1:N           │
+         │ owns          │
+         ▼               │
+┌──────────────────────┐ │
+│  citizen_records     │ │
+├──────────────────────┤ │
+│ id             PK    │ │
+│ citizen_user_id FK   │ │
+│ department_id  FK    │ │
+│ record_type ENUM     │ │
+│   NID/               │ │
+│   BIRTH_REGISTRATION │ │
+│ record_reference UNQ │ │
+│ full_name            │ │
+│ date_of_birth        │ │
+│ address              │ │
+│ record_version       │ │  ◄── optimistic concurrency
+│ created_at           │ │
+│ updated_at           │ │
+└──────────┬───────────┘ │
+           │ 1:N         │
+           ▼             │
+┌─────────────────────────┴──────────┐
+│      correction_requests           │
+├────────────────────────────────────┤
+│ id                       PK        │
+│ citizen_user_id          FK ──┐    │
+│ citizen_record_id        FK ──┼─┐  │
+│ department_id            FK ──┼─┼┐ │
+│                                │ │ │  COMPOSITE FK
+│                                ▼ ▼ ▼ │  → citizen_records
+│                          (id, citizen_user_id, department_id)
+│ field_name                         │
+│ old_value                          │
+│ proposed_value                     │
+│ reason                             │
+│ expected_record_version            │
+│ status ENUM                        │
+│   PENDING / APPROVED / REJECTED    │
+│ reviewed_by              FK ───────┘
+│ reviewed_at                        │
+│ rejection_reason                   │
+│ submitted_at                       │
+│ updated_at                         │
+└────────────────────────────────────┘
+```
+
+### What each table holds
+
+| Table | Purpose |
 |---|---|
 | `departments` | NID and Birth Registration; `is_active` for soft deactivation |
 | `users` | Citizens and officers; role ENUM; officers must have a `department_id`, citizens must not (enforced by a `CHECK` constraint) |
@@ -126,9 +348,9 @@ Five tables. Small on purpose, but every constraint matters:
 | `correction_requests` | The request itself — field name, old value, proposed value, reason, expected version, status, reviewer info |
 | `audit_logs` | Append-only events — pointer metadata only, no names or emails |
 
-A couple of design decisions worth calling out, because they're the ones that would matter in a real system:
+### Design decisions worth calling out
 
-**The composite foreign key.** A correction request stores `(citizen_record_id, citizen_user_id, department_id)`, and a composite FK ties that whole tuple back to the matching row in `citizen_records`. This means the database itself refuses to accept a request that names a record ID but pairs it with the wrong citizen or the wrong department. Application code has one less thing to get right.
+**The composite foreign key.** A correction request stores `(citizen_record_id, citizen_user_id, department_id)`, and a composite FK ties that whole tuple back to the matching row in `citizen_records`. The database itself refuses a request that names a record ID but pairs it with the wrong citizen or the wrong department. Application code has one less thing to get right.
 
 **The version invariant.** Every successful approval increments `citizen_records.record_version` by exactly one. A request stores `expected_record_version` at submission time. During approval, if the current version doesn't match, the request is rejected with `409 RECORD_STATE_CONFLICT`. This blocks the classic bug where a stale approval quietly overwrites someone else's newer change.
 
@@ -283,11 +505,6 @@ Both work identically. Then:
 8. Log back in as citizen, re-Authorize, `GET /citizen/records` — `BR-1001` now reads `"Md. Rakib Hossain"` and `record_version` is `2`
 
 That full loop — citizen submits, officer decides, citizen verifies — is the core feature the prototype exists to demonstrate.
-
-**Rejection works the same way, except:**
-- `reason` is required
-- The record is **not** modified
-- The rejection reason is stored on the request and visible to the citizen on their next fetch
 
 > **On the live deployment:** the Aiven database is shared, so if someone has already run the workflow above, `BR-1001` may already show `"Md. Rakib Hossain"` at version `2`. Running a new correction against it still works — the flow just starts from whatever state is currently in the DB.
 
