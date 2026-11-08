@@ -19,11 +19,11 @@ TRUNCATE TABLE correction_requests;
 SET FOREIGN_KEY_CHECKS = 1;
 
 UPDATE citizen_records
-SET full_name = 'Demo Citzen', record_version = 1
+SET full_name = 'Md. Rakib Hasan', record_version = 1
 WHERE record_reference = 'BR-1001';
 
 UPDATE citizen_records
-SET full_name = 'Demo Citizen', record_version = 1
+SET full_name = 'Md. Rakib Hossain', record_version = 1
 WHERE record_reference = 'NID-1001';
 
 SELECT 'Hard reset complete' AS status;

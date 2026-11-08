@@ -15,7 +15,7 @@ const DEPARTMENTS = [
 
 const USERS = [
     {
-        id: 1, name: 'Demo Citizen', email: 'citizen@example.com',
+        id: 1, name: 'Md. Rakib Hossain', email: 'citizen@example.com',
         role: 'CITIZEN', department_id: null, password: 'Demo@12345',
     },
     {
@@ -32,14 +32,14 @@ const RECORDS = [
     {
         id: 1, citizen_user_id: 1, department_id: 2,
         record_type: 'BIRTH_REGISTRATION', record_reference: 'BR-1001',
-        full_name: 'Demo Citzen',
+        full_name: 'Md. Rakib Hasan',
         date_of_birth: '1990-01-01', address: 'Dhaka, Bangladesh',
         record_version: 1,
     },
     {
         id: 2, citizen_user_id: 1, department_id: 1,
         record_type: 'NID', record_reference: 'NID-1001',
-        full_name: 'Demo Citizen',
+        full_name: 'Md. Rakib Hossain',
         date_of_birth: '1990-01-01', address: 'Dhaka, Bangladesh',
         record_version: 1,
     },

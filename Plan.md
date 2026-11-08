@@ -591,7 +591,7 @@ Seed:
 - Two departments: NID and BIRTH_REGISTRATION.
 - One citizen account.
 - Two officer accounts, each assigned to one department.
-- Two fictional records: `BR-1001` with name `Demo Citzen`; `NID-1001` with name `Demo Citizen`.
+- Two fictional records: `BR-1001` with name `Md. Rakib Hasan`; `NID-1001` with name `Md. Rakib Hossain`.
 
 Rules:
 
@@ -616,8 +616,8 @@ INSERT INTO citizen_records
   (id, citizen_user_id, department_id, record_type, record_reference,
    full_name, date_of_birth, address, record_version)
 VALUES
-  (1, 1, 2, 'BIRTH_REGISTRATION', 'BR-1001', 'Demo Citzen',  '1990-01-01', 'Dhaka, Bangladesh', 1),
-  (2, 1, 1, 'NID',               'NID-1001', 'Demo Citizen', '1990-01-01', 'Dhaka, Bangladesh', 1)
+  (1, 1, 2, 'BIRTH_REGISTRATION', 'BR-1001', 'Md. Rakib Hasan',  '1990-01-01', 'Dhaka, Bangladesh', 1),
+  (2, 1, 1, 'NID',               'NID-1001', 'Md. Rakib Hossain', '1990-01-01', 'Dhaka, Bangladesh', 1)
 ON DUPLICATE KEY UPDATE
   date_of_birth = VALUES(date_of_birth),
   address       = VALUES(address),
@@ -632,8 +632,8 @@ INSERT INTO citizen_records
   (id, citizen_user_id, department_id, record_type, record_reference,
    full_name, date_of_birth, address, record_version)
 VALUES
-  (1, 1, 2, 'BIRTH_REGISTRATION', 'BR-1001', 'Demo Citzen',  '1990-01-01', 'Dhaka, Bangladesh', 1),
-  (2, 1, 1, 'NID',               'NID-1001', 'Demo Citizen', '1990-01-01', 'Dhaka, Bangladesh', 1)
+  (1, 1, 2, 'BIRTH_REGISTRATION', 'BR-1001', 'Md. Rakib Hasan',  '1990-01-01', 'Dhaka, Bangladesh', 1),
+  (2, 1, 1, 'NID',               'NID-1001', 'Md. Rakib Hossain', '1990-01-01', 'Dhaka, Bangladesh', 1)
 ON DUPLICATE KEY UPDATE
   full_name      = VALUES(full_name),
   date_of_birth  = VALUES(date_of_birth),
@@ -648,7 +648,7 @@ ON DUPLICATE KEY UPDATE
 # Default mode is repeatable and preserves workflow-mutated full_name
 npm run db:seed
 npm run db:seed
-# After a successful approval, BR-1001 should remain 'Demo Citizen' on default seed:
+# After a successful approval, BR-1001 should remain 'Md. Rakib Hossain' on default seed:
 npm run db:seed
 
 # Reset mode restores the initial demo values without deleting request/audit history
@@ -658,7 +658,7 @@ npm run db:seed -- --reset
 mysql -u root -p cims_db -e "SELECT record_reference, full_name, record_version FROM citizen_records WHERE record_reference IN ('BR-1001','NID-1001');"
 ```
 
-Also compare request/audit row counts before and after reset. `BR-1001` must show `Demo Citzen`, `NID-1001` must show `Demo Citizen`, and both versions must be `1`; existing request/audit rows must remain unchanged. Previously finalized requests and audit events remain visible and may describe earlier record state; this is a demo-state reset, not a historical database reset. Expected base row counts: 3 users, 2 records, and 2 departments.
+Also compare request/audit row counts before and after reset. `BR-1001` must show `Md. Rakib Hasan`, `NID-1001` must show `Md. Rakib Hossain`, and both versions must be `1`; existing request/audit rows must remain unchanged. Previously finalized requests and audit events remain visible and may describe earlier record state; this is a demo-state reset, not a historical database reset. Expected base row counts: 3 users, 2 records, and 2 departments.
 
 ## M1.10 — Authentication Module
 

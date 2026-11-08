@@ -41,10 +41,10 @@ Fictional example used throughout the demo:
 
 | Document | Recorded name |
 |---|---|
-| Birth Registration | Demo Citzen *(typo)* |
-| National ID | Demo Citizen |
+| Birth Registration | Md. Rakib Hasan *(typo)* |
+| National ID | Md. Rakib Hossain |
 
-The whole point is to let the citizen ask for `"Demo Citzen"` to become `"Demo Citizen"` through a reviewed, audited process — not by editing a database row directly.
+The whole point is to let the citizen ask for `"Md. Rakib Hasan"` to become `"Md. Rakib Hossain"` through a reviewed, audited process — not by editing a database row directly.
 
 ---
 
@@ -221,8 +221,8 @@ Two seeded records, both owned by the same citizen:
 
 | Reference | Type | Current name | Department |
 |---|---|---|---|
-| `BR-1001` | BIRTH_REGISTRATION | **`Demo Citzen`** *(typo — this is the point)* | Birth Registration |
-| `NID-1001` | NID | `Demo Citizen` | NID |
+| `BR-1001` | BIRTH_REGISTRATION | **`Md. Rakib Hasan`** *(typo — this is the point)* | Birth Registration |
+| `NID-1001` | NID | `Md. Rakib Hossain` | NID |
 
 The typo in `BR-1001` is intentional. Without it, there's nothing to correct.
 
@@ -271,16 +271,16 @@ Both work identically. Then:
 4. `POST /citizen/records/BR-1001/correction-requests` with:
    ```json
    {
-     "changes": [{ "fieldName": "full_name", "proposedValue": "Demo Citizen" }],
+     "changes": [{ "fieldName": "full_name", "proposedValue": "Md. Rakib Hossain" }],
      "reason": "Name spelling correction"
    }
    ```
-   You'll get a `201` with `status: "PENDING"` and `oldValue: "Demo Citzen"` — that old value came from the DB, not from your request.
+   You'll get a `201` with `status: "PENDING"` and `oldValue: "Md. Rakib Hasan"` — that old value came from the DB, not from your request.
 
 5. Log in as the Birth Registration officer, re-Authorize
 6. `GET /officer/correction-requests?status=PENDING` — you'll see the request
 7. `PATCH /officer/correction-requests/{id}/decision` with `{ "decision": "APPROVED" }`
-8. Log back in as citizen, re-Authorize, `GET /citizen/records` — `BR-1001` now reads `"Demo Citizen"` and `record_version` is `2`
+8. Log back in as citizen, re-Authorize, `GET /citizen/records` — `BR-1001` now reads `"Md. Rakib Hossain"` and `record_version` is `2`
 
 That full loop — citizen submits, officer decides, citizen verifies — is the core feature the prototype exists to demonstrate.
 
@@ -289,7 +289,7 @@ That full loop — citizen submits, officer decides, citizen verifies — is the
 - The record is **not** modified
 - The rejection reason is stored on the request and visible to the citizen on their next fetch
 
-> **On the live deployment:** the Aiven database is shared, so if someone has already run the workflow above, `BR-1001` may already show `"Demo Citizen"` at version `2`. Running a new correction against it still works — the flow just starts from whatever state is currently in the DB.
+> **On the live deployment:** the Aiven database is shared, so if someone has already run the workflow above, `BR-1001` may already show `"Md. Rakib Hossain"` at version `2`. Running a new correction against it still works — the flow just starts from whatever state is currently in the DB.
 
 ---
 
@@ -319,7 +319,7 @@ Inserts anything missing. Doesn't overwrite `full_name` or `record_version` on e
 
 ### `npm run db:seed -- --reset` — restore demo values, keep history
 
-Resets `BR-1001.full_name = "Demo Citzen"` and both records' `record_version = 1`. Keeps request and audit history. Aborts if any `PENDING` requests exist — you need to finalize those first through the normal workflow. This is the mode to use if you want to re-run the demo without losing the audit trail.
+Resets `BR-1001.full_name = "Md. Rakib Hasan"` and both records' `record_version = 1`. Keeps request and audit history. Aborts if any `PENDING` requests exist — you need to finalize those first through the normal workflow. This is the mode to use if you want to re-run the demo without losing the audit trail.
 
 ### `database/reset-hard.sql` — clean slate for video
 

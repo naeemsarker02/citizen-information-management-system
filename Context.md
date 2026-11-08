@@ -31,9 +31,9 @@ Example of a fictional discrepancy:
 
 | Record | Recorded name |
 |---|---|
-| Birth Registration | Demo Citzen |
-| NID | Demo Citizen |
-| Passport | Demo Citizen |
+| Birth Registration | Md. Rakib Hasan |
+| NID | Md. Rakib Hossain |
+| Passport | Md. Rakib Hossain |
 
 This can create avoidable administrative effort and uncertainty for citizens. The project explores a more organized way to represent linked records and manage correction requests.
 
@@ -57,7 +57,7 @@ Approve / Reject
 Citizen Tracks the Final Status
 ```
 
-In this prototype, “linked records” means multiple fictional records are associated with the same local demo citizen account through `citizen_user_id`. It does not mean the records are synchronized with one another or linked to government systems. The platform is intended as a coordination and request-management layer. It does not assume that all government authorities share a database or expose public APIs.
+In this prototype, “linked records” means multiple fictional records are associated with the same local Md. Rakib Hossain account through `citizen_user_id`. It does not mean the records are synchronized with one another or linked to government systems. The platform is intended as a coordination and request-management layer. It does not assume that all government authorities share a database or expose public APIs.
 
 ### 1.3 Important Reality and Scope Disclaimer
 
@@ -487,7 +487,7 @@ Base path: `/api`
   "changes": [
     {
       "fieldName": "full_name",
-      "proposedValue": "Demo Citizen"
+      "proposedValue": "Md. Rakib Hossain"
     }
   ],
   "reason": "Name spelling correction"
@@ -737,8 +737,8 @@ Passwords must be stored as bcrypt hashes. These credentials are for local demo 
 
 | Reference | Type | Owner | Current name | Department |
 |---|---|---|---|---|
-| `BR-1001` | BIRTH_REGISTRATION | Demo Citizen | Demo Citzen | BIRTH_REGISTRATION |
-| `NID-1001` | NID | Demo Citizen | Demo Citizen | NID |
+| `BR-1001` | BIRTH_REGISTRATION | Md. Rakib Hossain | Md. Rakib Hasan | BIRTH_REGISTRATION |
+| `NID-1001` | NID | Md. Rakib Hossain | Md. Rakib Hossain | NID |
 
 All information is fictional. Do not enter actual NID numbers or private records.
 
@@ -772,7 +772,7 @@ npm run db:seed
 npm run db:seed -- --reset
 ```
 
-- Resets `BR-1001.full_name` to `'Demo Citzen'` and `NID-1001.full_name` to `'Demo Citizen'`.
+- Resets `BR-1001.full_name` to `'Md. Rakib Hasan'` and `NID-1001.full_name` to `'Md. Rakib Hossain'`.
 - Resets both records' `record_version` to `1`.
 - Does **not** delete or alter `correction_requests` or `audit_logs` history.
 - Before applying reset, the script must check for any `PENDING` correction requests. If any exist, abort with a clear message and leave all data unchanged; resolve those requests through the normal workflow first. This avoids leaving a pending request that blocks the next demo submission.
@@ -906,7 +906,7 @@ Before recording the walkthrough video, restore the demo to its initial state:
    ```powershell
    npm run db:seed -- --reset
    ```
-   This restores `BR-1001.full_name = 'Demo Citzen'`, `NID-1001.full_name = 'Demo Citizen'`, and both `record_version` values to `1`. It does not delete or alter request/audit history. The script must stop without changes if any request is still `PENDING`; resolve pending requests first.
+   This restores `BR-1001.full_name = 'Md. Rakib Hasan'`, `NID-1001.full_name = 'Md. Rakib Hossain'`, and both `record_version` values to `1`. It does not delete or alter request/audit history. The script must stop without changes if any request is still `PENDING`; resolve pending requests first.
 
 2. **Full local database reset — destructive:** only if you intentionally want a completely fresh database and do not need its existing request/audit history:
    ```powershell
