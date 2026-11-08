@@ -3,7 +3,6 @@ const app = require('../src/app');
 const { pool } = require('../src/config/database');
 const { hashPassword } = require('../src/utils/password');
 
-// Isolated test fixtures — do not touch demo accounts/records
 const TEST_USER = {
   id: 99,
   email: 'test-citizen@example.com',
@@ -13,7 +12,7 @@ const TEST_USER = {
 const TEST_RECORD = {
   id: 99,
   ref: 'BR-9001',
-  departmentId: 2, // BIRTH_REGISTRATION
+  departmentId: 2,
   initialName: 'Test Name',
 };
 
@@ -31,7 +30,6 @@ async function loginAs(email, password) {
 
 describe('Correction workflow', () => {
   beforeAll(async () => {
-    // ── Setup: test citizen + test record ─────────────────
     const hash = await hashPassword(TEST_USER.password);
 
     await pool.query(
@@ -60,7 +58,6 @@ describe('Correction workflow', () => {
   });
 
   afterAll(async () => {
-    // ── Cleanup in FK order ────────────────────────────────
     await pool.query(
       'DELETE FROM audit_logs WHERE entity_id IN (SELECT id FROM correction_requests WHERE citizen_user_id = ?)',
       [TEST_USER.id]
@@ -91,7 +88,6 @@ describe('Correction workflow', () => {
 
       approvedRequestId = res.body.data.request.id;
 
-      // Audit row exists with pointer metadata only
       const [audits] = await pool.query(
         `SELECT action, metadata FROM audit_logs
          WHERE entity_type = 'correction_request' AND entity_id = ?`,
@@ -122,7 +118,6 @@ describe('Correction workflow', () => {
     });
 
     it('rejects no-op (proposed === current) with 400', async () => {
-      // Record still has initialName because nothing approved yet
       const res = await request(app)
         .post(`/api/citizen/records/${TEST_RECORD.ref}/correction-requests`)
         .set('Authorization', `Bearer ${citizenToken}`)
@@ -150,7 +145,7 @@ describe('Correction workflow', () => {
         reviewerName: expect.any(String),
       });
 
-      // Verify DB state
+
       const [recRows] = await pool.query(
         'SELECT full_name, record_version FROM citizen_records WHERE id = ?',
         [TEST_RECORD.id]
@@ -158,7 +153,6 @@ describe('Correction workflow', () => {
       expect(recRows[0].full_name).toBe('Test Name Updated');
       expect(recRows[0].record_version).toBe(2);
 
-      // Audit REQUEST_APPROVED exists
       const [audits] = await pool.query(
         `SELECT action, metadata FROM audit_logs
          WHERE entity_id = ? AND action = 'REQUEST_APPROVED'`,
@@ -192,7 +186,6 @@ describe('Correction workflow', () => {
         });
 
       expect(res.status).toBe(201);
-      // Old value must reflect the prior approval
       expect(res.body.data.request.oldValue).toBe('Test Name Updated');
       expect(res.body.data.request.expectedRecordVersion).toBe(2);
 
@@ -211,7 +204,6 @@ describe('Correction workflow', () => {
         'Supporting information is insufficient.'
       );
 
-      // Record must remain at approved state
       const [recRows] = await pool.query(
         'SELECT full_name, record_version FROM citizen_records WHERE id = ?',
         [TEST_RECORD.id]
@@ -219,7 +211,6 @@ describe('Correction workflow', () => {
       expect(recRows[0].full_name).toBe('Test Name Updated');
       expect(recRows[0].record_version).toBe(2);
 
-      // Audit REQUEST_REJECTED exists
       const [audits] = await pool.query(
         `SELECT action FROM audit_logs
          WHERE entity_id = ? AND action = 'REQUEST_REJECTED'`,
@@ -229,7 +220,6 @@ describe('Correction workflow', () => {
     });
 
     it('rejects REJECTED decision without reason with 400', async () => {
-      // Create a fresh request, then try to reject without reason
       const create = await request(app)
         .post(`/api/citizen/records/${TEST_RECORD.ref}/correction-requests`)
         .set('Authorization', `Bearer ${citizenToken}`)
@@ -247,7 +237,6 @@ describe('Correction workflow', () => {
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
 
-      // Cleanup fresh request to leave clean state (still PENDING → use reject-with-reason for cleanliness)
       await request(app)
         .patch(`/api/officer/correction-requests/${freshId}/decision`)
         .set('Authorization', `Bearer ${officerToken}`)

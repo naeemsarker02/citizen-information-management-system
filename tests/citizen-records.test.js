@@ -57,8 +57,6 @@ describe('Citizen records endpoints', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.data.record.recordReference).toBe('BR-1001');
-      // Demo baseline: "Demo Citzen" (typo) — may change after workflow tests
-      // in correction-workflow.test.js. This assertion runs before those.
       expect(res.body.data.record.fullName).toEqual(expect.any(String));
     });
 

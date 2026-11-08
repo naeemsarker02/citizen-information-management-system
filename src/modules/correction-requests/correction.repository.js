@@ -1,9 +1,5 @@
 const { pool } = require('../../config/database');
 
-// ════════════════════════════════════════════════════════════════
-// M2.4 — Record + request access (transactional create)
-// ════════════════════════════════════════════════════════════════
-
 async function findRecordByReferenceForUpdate(conn, recordRef) {
   const [rows] = await conn.query(
     `SELECT id, citizen_user_id, department_id, record_type, record_reference,
@@ -50,10 +46,6 @@ async function insertRequest(conn, data) {
   return result.insertId;
 }
 
-// ════════════════════════════════════════════════════════════════
-// M2.5 — Citizen tracking
-// ════════════════════════════════════════════════════════════════
-
 async function findByCitizenId(userId) {
   const [rows] = await pool.query(
     `SELECT id, citizen_user_id, citizen_record_id, department_id,
@@ -83,10 +75,6 @@ async function findByIdGlobal(requestId) {
   );
   return rows[0] || null;
 }
-
-// ════════════════════════════════════════════════════════════════
-// M3.1, M3.2 — Officer read views
-// ════════════════════════════════════════════════════════════════
 
 async function findByDepartment({ departmentId, status }) {
   const conditions = ['cr.department_id = ?'];
@@ -151,15 +139,8 @@ async function findRequestDetailByIdTx(conn, requestId) {
   return _fetchDetail(conn, requestId);
 }
 
-// ════════════════════════════════════════════════════════════════
-// M3.4, M3.5 — Decision transaction primitives
-// ════════════════════════════════════════════════════════════════
-
 /**
- * Step 1 of decision flow: non-locking read of citizen_record_id.
- * MUST NOT use FOR UPDATE — we need the record ID first to lock in the
- * universal order (record → request). Locking the request here would
- * violate that order.
+ * Read without locking to preserve the record -> request lock order.
  */
 async function findRequestRecordId(conn, requestId) {
   const [rows] = await conn.query(
@@ -169,7 +150,6 @@ async function findRequestRecordId(conn, requestId) {
   return rows[0] ? rows[0].citizen_record_id : null;
 }
 
-/** Step 2: lock record row (lock #1). */
 async function lockRecordById(conn, recordId) {
   const [rows] = await conn.query(
     `SELECT id, citizen_user_id, department_id, record_type, record_reference,
@@ -182,7 +162,6 @@ async function lockRecordById(conn, recordId) {
   return rows[0] || null;
 }
 
-/** Step 3: lock request row (lock #2). */
 async function lockRequestById(conn, requestId) {
   const [rows] = await conn.query(
     `SELECT id, citizen_user_id, citizen_record_id, department_id,
@@ -197,7 +176,6 @@ async function lockRequestById(conn, requestId) {
   return rows[0] || null;
 }
 
-/** Step 8 (approve only): update record column + bump version atomically. */
 async function updateRecordFullName(conn, recordId, newFullName) {
   const [result] = await conn.query(
     `UPDATE citizen_records
@@ -208,7 +186,6 @@ async function updateRecordFullName(conn, recordId, newFullName) {
   return result.affectedRows === 1;
 }
 
-/** Step 9 (approve): finalize request as APPROVED. */
 async function markRequestApproved(conn, requestId, reviewerId) {
   await conn.query(
     `UPDATE correction_requests
@@ -218,7 +195,6 @@ async function markRequestApproved(conn, requestId, reviewerId) {
   );
 }
 
-/** Step 9 (reject): finalize request as REJECTED with reason. */
 async function markRequestRejected(conn, requestId, reviewerId, rejectionReason) {
   await conn.query(
     `UPDATE correction_requests
@@ -230,18 +206,14 @@ async function markRequestRejected(conn, requestId, reviewerId, rejectionReason)
 }
 
 module.exports = {
-  // M2.4
   findRecordByReferenceForUpdate,
   findPendingRequestForField,
   insertRequest,
-  // M2.5
   findByCitizenId,
   findByIdGlobal,
-  // M3.1, M3.2
   findByDepartment,
   findRequestDetailById,
   findRequestDetailByIdTx,
-  // M3.4, M3.5
   findRequestRecordId,
   lockRecordById,
   lockRequestById,

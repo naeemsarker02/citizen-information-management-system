@@ -29,9 +29,6 @@ async function getRecordByReference(user, recordRef) {
     throw new ApiError(404, 'RECORD_NOT_FOUND', 'Record not found.');
   }
 
-  // ⭐ Ownership check — DB query-তে filter নয়, service-এ explicit
-  // কারণ: 403 NOT_RECORD_OWNER (record exists কিন্তু অন্যের)
-  // 404 RECORD_NOT_FOUND (record-ই নেই) — distinct
   if (record.citizen_user_id !== user.id) {
     throw new ApiError(403, 'NOT_RECORD_OWNER', 'This record does not belong to you.');
   }

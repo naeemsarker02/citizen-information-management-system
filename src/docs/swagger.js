@@ -1,11 +1,3 @@
-/**
- * CIMS API — OpenAPI 3.0 specification.
- *
- * Central spec file (no inline JSDoc on routes) so the contract for all
- * 11 endpoints lives in one place. Easier to review and audit against
- * Context.md §9 than scattered annotations.
- */
-
 const swaggerJsdoc = require('swagger-jsdoc');
 
 const spec = {
@@ -15,7 +7,7 @@ const spec = {
     version: '1.0.0',
     description:
       'Citizen Information Management System — Credosis Phase 02 Backend Prototype.\n\n' +
-      '⚠️ Fictional demo data only. Not connected to any real government database.\n\n' +
+      'Fictional demo data only. Not connected to any real government database.\n\n' +
       '**Test flow:**\n' +
       '1. `POST /api/auth/login` with citizen → copy `data.token`\n' +
       '2. Click **Authorize** → paste token\n' +
@@ -45,7 +37,6 @@ servers: [
     },
 
     schemas: {
-      // ── Shared ────────────────────────────────────────────
       ErrorEnvelope: {
         type: 'object',
         required: ['success', 'error'],
@@ -73,7 +64,6 @@ servers: [
         },
       },
 
-      // ── Auth ──────────────────────────────────────────────
       LoginRequest: {
         type: 'object',
         required: ['email', 'password'],
@@ -110,7 +100,6 @@ servers: [
         },
       },
 
-      // ── Records ───────────────────────────────────────────
       CitizenRecord: {
         type: 'object',
         properties: {
@@ -127,7 +116,6 @@ servers: [
         },
       },
 
-      // ── Correction requests ───────────────────────────────
       CreateCorrectionRequest: {
         type: 'object',
         required: ['changes', 'reason'],
@@ -248,11 +236,7 @@ servers: [
     },
   },
 
-  // ════════════════════════════════════════════════════════════
-  // PATHS — 11 endpoints
-  // ════════════════════════════════════════════════════════════
   paths: {
-    // ── 1. Health ───────────────────────────────────────────
     '/api/health': {
       get: {
         tags: ['Health'],
@@ -277,7 +261,6 @@ servers: [
       },
     },
 
-    // ── 2. Login ────────────────────────────────────────────
     '/api/auth/login': {
       post: {
         tags: ['Auth'],
@@ -315,7 +298,6 @@ servers: [
       },
     },
 
-    // ── 3. Me ───────────────────────────────────────────────
     '/api/auth/me': {
       get: {
         tags: ['Auth'],
@@ -351,7 +333,6 @@ servers: [
       },
     },
 
-    // ── 4. List own records ─────────────────────────────────
     '/api/citizen/records': {
       get: {
         tags: ['Citizen — Records'],
@@ -386,7 +367,6 @@ servers: [
       },
     },
 
-    // ── 5. Get record by reference ──────────────────────────
     '/api/citizen/records/{recordRef}': {
       get: {
         tags: ['Citizen — Records'],
@@ -426,7 +406,6 @@ servers: [
       },
     },
 
-    // ── 6. Submit correction request ────────────────────────
     '/api/citizen/records/{recordRef}/correction-requests': {
       post: {
         tags: ['Citizen — Requests'],
@@ -482,7 +461,6 @@ servers: [
       },
     },
 
-    // ── 7. List own correction requests ─────────────────────
     '/api/citizen/correction-requests': {
       get: {
         tags: ['Citizen — Requests'],
@@ -516,7 +494,6 @@ servers: [
       },
     },
 
-    // ── 8. Get own request by id ────────────────────────────
     '/api/citizen/correction-requests/{id}': {
       get: {
         tags: ['Citizen — Requests'],
@@ -550,7 +527,6 @@ servers: [
       },
     },
 
-    // ── 9. Officer list ─────────────────────────────────────
     '/api/officer/correction-requests': {
       get: {
         tags: ['Officer'],
@@ -594,7 +570,6 @@ servers: [
       },
     },
 
-    // ── 10. Officer detail ──────────────────────────────────
     '/api/officer/correction-requests/{id}': {
       get: {
         tags: ['Officer'],
@@ -627,7 +602,6 @@ servers: [
       },
     },
 
-    // ── 11. Officer decision ────────────────────────────────
     '/api/officer/correction-requests/{id}/decision': {
       patch: {
         tags: ['Officer'],

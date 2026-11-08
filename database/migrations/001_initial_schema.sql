@@ -1,9 +1,7 @@
--- ─────────────────────────────────────────────────────────────
 -- CIMS Phase 02 — Initial Schema
 -- 5 tables: departments, users, citizen_records,
 --           correction_requests, audit_logs
 -- Requires: MySQL 8.0.16+ (for enforced CHECK constraints)
--- ─────────────────────────────────────────────────────────────
 
 -- Safety: this script does not create the database.
 -- The database `cims_db` must already exist (created via mysql CLI).
@@ -17,7 +15,6 @@ DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS departments;
 SET FOREIGN_KEY_CHECKS = 1;
 
--- ─── 1. departments ──────────────────────────────────────────
 CREATE TABLE departments (
   id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   name        VARCHAR(100) NOT NULL,
@@ -26,7 +23,6 @@ CREATE TABLE departments (
   created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ─── 2. users ────────────────────────────────────────────────
 CREATE TABLE users (
   id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   name           VARCHAR(100) NOT NULL,
@@ -47,7 +43,6 @@ CREATE TABLE users (
 
 CREATE INDEX idx_users_department ON users(department_id);
 
--- ─── 3. citizen_records ──────────────────────────────────────
 CREATE TABLE citizen_records (
   id               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   citizen_user_id  INT UNSIGNED NOT NULL,
@@ -71,7 +66,6 @@ CREATE TABLE citizen_records (
 CREATE INDEX idx_records_citizen ON citizen_records(citizen_user_id);
 CREATE INDEX idx_records_department ON citizen_records(department_id);
 
--- ─── 4. correction_requests ──────────────────────────────────
 CREATE TABLE correction_requests (
   id                       INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   citizen_user_id          INT UNSIGNED NOT NULL,
@@ -103,7 +97,6 @@ CREATE INDEX idx_req_dept_status
 CREATE INDEX idx_req_citizen
   ON correction_requests(citizen_user_id, submitted_at);
 
--- ─── 5. audit_logs ───────────────────────────────────────────
 CREATE TABLE audit_logs (
   id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   actor_user_id  INT UNSIGNED NOT NULL,

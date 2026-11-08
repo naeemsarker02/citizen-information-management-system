@@ -1,6 +1,5 @@
 const { pool } = require('../../config/database');
 
-// ── Used by login (M1.10) ────────────────────────────────
 async function findUserByEmail(email) {
   const [rows] = await pool.query(
     `SELECT id, name, email, password_hash, role, department_id, is_active
@@ -12,7 +11,6 @@ async function findUserByEmail(email) {
   return rows[0] || null;
 }
 
-// ── Used by authenticate middleware (future refactor) ────
 async function findAuthUserById(userId) {
   const [rows] = await pool.execute(
     `SELECT

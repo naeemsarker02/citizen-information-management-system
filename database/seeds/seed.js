@@ -1,9 +1,7 @@
-// ─────────────────────────────────────────────────────────────
 // CIMS Phase 02 — Seed Script
 // Modes:
 //   npm run db:seed              → default (preserve workflow state)
 //   npm run db:seed -- --reset   → reset BR-1001/NID-1001 to initial
-// ─────────────────────────────────────────────────────────────
 
 const { pool } = require('../../src/config/database');
 const { hashPassword } = require('../../src/utils/password');
@@ -30,12 +28,11 @@ const USERS = [
     },
 ];
 
-// ⚠️ BR-1001 has the INTENTIONAL typo "Demo Citzen" — this is the demo's core scenario
 const RECORDS = [
     {
         id: 1, citizen_user_id: 1, department_id: 2,
         record_type: 'BIRTH_REGISTRATION', record_reference: 'BR-1001',
-        full_name: 'Demo Citzen',           // typo on purpose
+        full_name: 'Demo Citzen',
         date_of_birth: '1990-01-01', address: 'Dhaka, Bangladesh',
         record_version: 1,
     },
@@ -49,7 +46,6 @@ const RECORDS = [
 ];
 
 async function seedCore(executor, { resetRecords }) {
-    // ── 1. Departments ─────────────────────────────────────
     for (const d of DEPARTMENTS) {
         await executor.query(
             `INSERT INTO departments (id, code, name, is_active)
@@ -62,7 +58,6 @@ async function seedCore(executor, { resetRecords }) {
         );
     }
 
-    // ── 2. Users (bcrypt hash generated at runtime) ─────────
     for (const u of USERS) {
         const hash = await hashPassword(u.password);
         await executor.query(
@@ -78,7 +73,6 @@ async function seedCore(executor, { resetRecords }) {
         );
     }
 
-    // ── 3. Citizen records ──────────────────────────────────
     // Default mode: preserve full_name + record_version (workflow state)
     // Reset mode:   restore full_name + record_version to initial values
     const onDuplicate = resetRecords
@@ -106,7 +100,7 @@ async function seedCore(executor, { resetRecords }) {
 
 async function runDefault() {
     await seedCore(pool, { resetRecords: false });
-    console.log('✅ Seed complete (default mode — workflow state preserved)');
+    console.log('Seed complete (default mode — workflow state preserved)');
 }
 
 async function runReset() {
@@ -120,17 +114,17 @@ async function runReset() {
         );
         if (pending.length > 0) {
             await conn.rollback();
-            console.error('❌ Reset aborted: PENDING correction requests exist.');
+            console.error('Reset aborted: PENDING correction requests exist.');
             console.error('   Resolve them through the officer workflow first.');
             throw new Error('RESET_BLOCKED_BY_PENDING_REQUESTS');
         }
 
         await seedCore(conn, { resetRecords: true });
         await conn.commit();
-        console.log('✅ Reset complete — full_name and record_version restored');
+        console.log('Reset complete — full_name and record_version restored');
         console.log('   Existing correction_requests and audit_logs preserved.');
     } catch (err) {
-        try { await conn.rollback(); } catch { /* ignore */ }
+        try { await conn.rollback(); } catch {}
         throw err;
     } finally {
         conn.release();
@@ -140,14 +134,14 @@ async function runReset() {
 (async () => {
     try {
         if (RESET_MODE) {
-            console.log('🔄 Running in RESET mode');
+            console.log('Running in RESET mode');
             await runReset();
         } else {
-            console.log('🌱 Running in DEFAULT mode');
+            console.log('Running in DEFAULT mode');
             await runDefault();
         }
     } catch (err) {
-        console.error('❌ Seed failed:', err.message);
+        console.error('Seed failed:', err.message);
         process.exitCode = 1;
     } finally {
         await pool.end();

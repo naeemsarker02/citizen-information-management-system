@@ -3,14 +3,10 @@ const path = require('path');
 const dotenv = require('dotenv');
 const { z } = require('zod');
 
-// 1. Load .env from the project root.
-// __dirname = src/config
-// ../../.env = project-root/.env
 dotenv.config({
     path: path.resolve(__dirname, '../../.env'),
 });
 
-// 2. Define the environment variable schema.
 const envSchema = z.object({
     NODE_ENV: z
         .enum(['development', 'test', 'production'])
@@ -52,7 +48,6 @@ const envSchema = z.object({
         .default('2h'),
 }).strict();
 
-// 3. Pick only the variables used by this application.
 const rawEnv = {
     NODE_ENV: process.env.NODE_ENV,
     PORT: process.env.PORT,
@@ -65,7 +60,6 @@ const rawEnv = {
     JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN,
 };
 
-// 4. Validate and normalize the environment.
 const parsedEnv = envSchema.safeParse(rawEnv);
 
 if (!parsedEnv.success) {
@@ -81,7 +75,6 @@ if (!parsedEnv.success) {
     );
 }
 
-// 5. Export a structured configuration object.
 const env = {
     nodeEnv: parsedEnv.data.NODE_ENV,
     port: parsedEnv.data.PORT,

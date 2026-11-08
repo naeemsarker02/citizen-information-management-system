@@ -5,7 +5,6 @@ const { verifyToken } = require('../utils/jwt');
 const { findAuthUserById } = require('../modules/auth/auth.repository');
 
 const authenticate = asyncHandler(async (req, res, next) => {
-    // 1. Read the Authorization header.
     const authorization = req.get('authorization');
 
     if (!authorization) {
@@ -16,7 +15,6 @@ const authenticate = asyncHandler(async (req, res, next) => {
         );
     }
 
-    // 2. Extract the Bearer token.
     const match = authorization.match(/^Bearer\s+(\S+)$/i);
 
     if (!match) {
@@ -27,7 +25,6 @@ const authenticate = asyncHandler(async (req, res, next) => {
         );
     }
 
-    // 3. Verify JWT.
     let payload;
 
     try {
@@ -40,7 +37,6 @@ const authenticate = asyncHandler(async (req, res, next) => {
         );
     }
 
-    // 4. Validate JWT subject.
     const subject = payload.sub;
 
     if (
@@ -58,10 +54,8 @@ const authenticate = asyncHandler(async (req, res, next) => {
 
     const userId = Number(subject);
 
-    // 5. Load the current user through the repository.
     const user = await findAuthUserById(userId);
 
-    // 6. Reject missing or inactive users.
     if (!user || Number(user.is_active) !== 1) {
         throw new ApiError(
             401,
@@ -70,7 +64,6 @@ const authenticate = asyncHandler(async (req, res, next) => {
         );
     }
 
-    // 7. Reject officers with missing or inactive departments.
     if (
         user.role === 'OFFICER' &&
         (
@@ -85,7 +78,6 @@ const authenticate = asyncHandler(async (req, res, next) => {
         );
     }
 
-    // 8. Attach fresh, safe user information to the request.
     req.user = {
         id: Number(user.id),
         name: user.name,

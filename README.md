@@ -7,15 +7,13 @@ Everything runs on fictional data. No government API, no real NID, no production
 **Stack:** Node.js · Express 5 · MySQL 8 · JWT · Zod · Swagger UI
 **Deployed on:** Render (API) + Aiven (MySQL, managed)
 
----
+## Live Demo
 
-## 🚀 Live Demo
+The API is deployed on Render (Node.js) with MySQL on Aiven. The easiest way to explore it is Swagger UI — it's interactive, so you can browse and execute every endpoint directly from the browser.
 
-**[Open the live Swagger UI →](https://citizen-information-management-system.onrender.com/api-docs)**
-
-- - **API base URL:** `https://citizen-information-management-system.onrender.com` (try [`/api-docs`](https://citizen-information-management-system.onrender.com/api-docs))
-- **Health check:** [`/api/health`](https://citizen-information-management-system.onrender.com/api/health)
-- **Interactive docs:** [`/api-docs`](https://citizen-information-management-system.onrender.com/api-docs)
+- **Swagger UI** (browse + test every endpoint): https://citizen-information-management-system.onrender.com/api-docs
+- **API base URL** (for curl / Postman / HTTP clients): `https://citizen-information-management-system.onrender.com`
+- **Health check:** https://citizen-information-management-system.onrender.com/api/health
 
 Log in with any of the [demo accounts](#demo-accounts) — click **Authorize** with the returned token, and every endpoint becomes clickable. The full correction workflow runs against the live Aiven database, not a mock.
 
@@ -199,10 +197,10 @@ npm run dev
 You should see:
 
 ```
-✅ MySQL connected
-🚀 CIMS API running on http://localhost:5000
-📘 Health:      http://localhost:5000/api/health
-🔐 Auth login:  POST http://localhost:5000/api/auth/login
+MySQL connected
+CIMS API running on http://localhost:5000
+Health:      http://localhost:5000/api/health
+Auth login:  POST http://localhost:5000/api/auth/login
 ```
 
 Open **http://localhost:5000/api-docs** for the interactive API.

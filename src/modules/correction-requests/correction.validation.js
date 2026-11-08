@@ -23,19 +23,12 @@ const requestIdParamSchema = z
   })
   .strict();
 
-// ── M3.1: Officer list query filter ──────────────────────────
 const officerListQuerySchema = z
   .object({
     status: z.enum(['PENDING', 'APPROVED', 'REJECTED']).optional(),
   })
   .strict();
 
-// ── M3.3: Officer decision body ──────────────────────────────
-// Enforces:
-//   - decision is APPROVED or REJECTED
-//   - REJECTED requires a trimmed reason of 5–500 chars
-//   - APPROVED must NOT include a reason (contract violation rejected)
-//   - unknown keys rejected (.strict())
 const decisionSchema = z
   .object({
     decision: z.enum(['APPROVED', 'REJECTED']),
