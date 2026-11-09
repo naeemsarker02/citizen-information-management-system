@@ -10,8 +10,8 @@
     "test": "jest --runInBand --forceExit",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "dev": "nodemon src/server.js",
-    "start": "node src/server.js",
+    "dev": "node init && nodemon src/server.js",
+    "start": "node init && node src/server.js",
     "db:schema": "mysql -u root -p cims_db < database/migrations/001_initial_schema.sql",
     "db:seed": "node database/seeds/seed.js"
   },

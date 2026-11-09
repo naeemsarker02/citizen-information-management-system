@@ -22,7 +22,7 @@ Everything runs on fictional data. No government API, no real NID, no production
 | API Base URL | [Production API](https://citizen-information-management-system.onrender.com) |
 | Health Check | [Check API Health](https://citizen-information-management-system.onrender.com/api/health) |
 | GitHub Repository | [Source Code](https://github.com/naeemsarker02/citizen-information-management-system) |
-| Video Walkthrough | [Watch the walkthrough →](youtube link) |
+| Video Walkthrough | [Watch the walkthrough →](https://www.youtube.com/watch?v=iK9ToUMoJlA) |
 
 **Video coverage:** The problem, live demo, technical decisions, and one thing I'd change if I started over.
 

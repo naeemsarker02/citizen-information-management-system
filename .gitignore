@@ -1,6 +1,4 @@
 node_modules/
-.env
-.env.*
 !.env.example
 coverage/
 *.log
@@ -8,9 +6,9 @@ npm-debug.log*
 .DS_Store
 *.before-glob-override
 .nyc_output/
-.vscode/
 .idea/
 Thumbs.db
 tmp/
 dist/
 
+config.bat
